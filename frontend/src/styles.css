@@ -1,0 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+@tailwind base; @tailwind components; @tailwind utilities;
+:root { color-scheme: light; } * { box-sizing: border-box; } html { scroll-behavior: smooth; } body { margin:0; min-width:320px; background:#f8fafc; color:#101828; font-family:'DM Sans',sans-serif; }
+.dark body { background:#0b1220; color:#f8fafc; }
+button, input, textarea { font: inherit; } button:focus-visible, input:focus-visible, textarea:focus-visible { outline:3px solid rgba(38,149,240,.3); outline-offset:2px; }

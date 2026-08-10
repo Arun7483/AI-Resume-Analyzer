@@ -1,0 +1,2 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = { content: ['./src/**/*.{html,ts}'], darkMode: 'class', theme: { extend: { colors: { ink: '#101828', brand: { 50:'#eef7ff', 100:'#d9edff', 500:'#2695f0', 600:'#147bd1', 700:'#1163a8' }, mint: '#48d6ad' }, boxShadow: { soft:'0 18px 50px rgba(16, 24, 40, .08)' }, fontFamily: { sans:['Inter','ui-sans-serif','system-ui'] } } }, plugins: [] };
