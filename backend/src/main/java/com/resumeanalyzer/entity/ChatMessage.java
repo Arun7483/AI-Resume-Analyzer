@@ -1,0 +1,75 @@
+package com.resumeanalyzer.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.Instant;
+
+@Entity
+@Table(
+        name = "chat_messages",
+        indexes = {
+                @Index(
+                        name = "idx_chat_user_time",
+                        columnList = "user_id,timestamp"
+                ),
+                @Index(
+                        name = "idx_chat_resume",
+                        columnList = "resume_id"
+                )
+        }
+)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ChatMessage {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+            name = "user_id",
+            nullable = false
+    )
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "resume_id"
+    )
+    private Resume resume;
+
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "sender",
+            nullable = false,
+            length = 10
+    )
+    private Sender sender;
+
+    @Lob
+    @Column(
+            name = "content",
+            nullable = false,
+            columnDefinition = "TEXT"
+    )
+    private String content;
+
+    @CreationTimestamp
+    @Column(
+            name = "timestamp",
+            nullable = false,
+            updatable = false
+    )
+    private Instant timestamp;
+
+    public enum Sender {
+        USER,
+        BOT
+    }
+}

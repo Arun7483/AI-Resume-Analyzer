@@ -1,0 +1,96 @@
+services:
+
+  # =====================================================
+  # BACKEND - SPRING BOOT API
+  # =====================================================
+
+  - type: web
+    name: resume-analyzer-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    autoDeployTrigger: commit
+    healthCheckPath: /actuator/health
+
+    envVars:
+
+      # -------------------------------------------------
+      # AIVEN POSTGRESQL
+      # -------------------------------------------------
+
+      - key: DATABASE_URL
+        sync: false
+
+      - key: DB_USERNAME
+        sync: false
+
+      - key: DB_PASSWORD
+        sync: false
+
+      # -------------------------------------------------
+      # GROQ
+      # -------------------------------------------------
+
+      - key: GROQ_API_KEY
+        sync: false
+
+      # -------------------------------------------------
+      # GMAIL SMTP
+      # -------------------------------------------------
+
+      - key: MAIL_USERNAME
+        sync: false
+
+      - key: MAIL_PASSWORD
+        sync: false
+
+      # -------------------------------------------------
+      # JWT
+      # -------------------------------------------------
+
+      - key: JWT_SECRET
+        generateValue: true
+
+      - key: JWT_EXPIRATION
+        value: "3600000"
+
+      # -------------------------------------------------
+      # CORS
+      # -------------------------------------------------
+
+      - key: CORS_ALLOWED_ORIGIN
+        value: https://resume-pulse-frontend-bbep.onrender.com
+
+      # -------------------------------------------------
+      # BACKEND URL
+      # -------------------------------------------------
+
+      - key: APP_BACKEND_URL
+        value: https://resume-analyzer-api-bbep.onrender.com
+
+      # -------------------------------------------------
+      # FILE STORAGE
+      # -------------------------------------------------
+
+      - key: RESUME_STORAGE_PATH
+        value: ./uploads
+
+
+  # =====================================================
+  # FRONTEND - ANGULAR
+  # =====================================================
+
+  - type: web
+    name: resume-pulse-frontend
+    runtime: static
+    rootDir: frontend
+
+    buildCommand: npm install && npm run build
+
+    staticPublishPath: ./dist
+
+    envVars:
+      - key: API_URL
+        value: https://resume-analyzer-api-bbep.onrender.com
