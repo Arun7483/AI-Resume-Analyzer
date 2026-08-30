@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpInterceptorFn } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { tap } from 'rxjs';
 import { API_BASE_URL } from '../api.config';
@@ -27,25 +27,25 @@ export class AuthService {
     localStorage.getItem(this.tokenKey)
   );
 
-  readonly fullName = signal(
+  readonly fullName = signal<string>(
     localStorage.getItem(this.nameKey) ?? ''
   );
 
-  readonly isAuthenticated = computed(() => !!this.token());
+  readonly isAuthenticated = computed(
+    () => !!this.token()
+  );
 
   login(email: string, password: string) {
     return this.http
       .post<AuthResponse>(
         `${API_BASE_URL}/api/v1/auth/login`,
         {
-          email: email.trim(),
+          email,
           password
         }
       )
       .pipe(
-        tap(response => {
-          this.store(response);
-        })
+        tap(response => this.store(response))
       );
   }
 
@@ -58,18 +58,13 @@ export class AuthService {
       .post<AuthResponse>(
         `${API_BASE_URL}/api/v1/auth/register`,
         {
-          fullName: fullName.trim(),
-          email: email.trim(),
+          fullName,
+          email,
           password
         }
       )
       .pipe(
-        tap(response => {
-          // Only store a token if registration immediately authenticates
-          // the user. If email verification is required, accessToken
-          // should normally be null.
-          this.store(response);
-        })
+        tap(response => this.store(response))
       );
   }
 
@@ -101,3 +96,30 @@ export class AuthService {
     this.fullName.set(response.fullName ?? '');
   }
 }
+
+
+/**
+ * JWT HTTP interceptor
+ *
+ * Automatically adds:
+ *
+ * Authorization: Bearer <JWT>
+ *
+ * to API requests when the user is logged in.
+ */
+export const authInterceptor: HttpInterceptorFn = (request, next) => {
+
+  const token = localStorage.getItem('resume-pulse-token');
+
+  if (!token) {
+    return next(request);
+  }
+
+  const authenticatedRequest = request.clone({
+    setHeaders: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  return next(authenticatedRequest);
+};
