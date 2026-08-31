@@ -23,7 +23,9 @@ import {
 
 
 @Component({
+
   selector: 'app-auth',
+
   standalone: true,
 
   imports: [
@@ -41,7 +43,7 @@ import {
         class="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl sm:p-9"
       >
 
-        <!-- Logo -->
+        <!-- LOGO -->
 
         <div class="mb-8 text-center">
 
@@ -81,7 +83,7 @@ import {
         </div>
 
 
-        <!-- Login/Register switch -->
+        <!-- LOGIN / REGISTER TABS -->
 
         <div
           class="mb-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1"
@@ -113,12 +115,15 @@ import {
         </div>
 
 
-        <!-- Authentication form -->
+        <!-- FORM -->
 
         <form
           class="space-y-4"
           (ngSubmit)="submit()"
         >
+
+
+          <!-- FULL NAME -->
 
           @if (registerMode()) {
 
@@ -127,7 +132,9 @@ import {
               <span
                 class="mb-1 block text-xs font-bold text-slate-600"
               >
+
                 Full name
+
               </span>
 
 
@@ -158,14 +165,16 @@ import {
           }
 
 
-          <!-- Email -->
+          <!-- EMAIL -->
 
           <label class="block">
 
             <span
               class="mb-1 block text-xs font-bold text-slate-600"
             >
+
               Email
+
             </span>
 
 
@@ -195,14 +204,16 @@ import {
           </label>
 
 
-          <!-- Password -->
+          <!-- PASSWORD -->
 
           <label class="block">
 
             <span
               class="mb-1 block text-xs font-bold text-slate-600"
             >
+
               Password
+
             </span>
 
 
@@ -224,7 +235,7 @@ import {
                 minlength="8"
                 type="password"
                 class="w-full py-3 text-sm outline-none"
-                autocomplete="new-password"
+                autocomplete="current-password"
                 placeholder="Minimum 8 characters"
               />
 
@@ -233,7 +244,23 @@ import {
           </label>
 
 
-          <!-- Error / message -->
+          <!-- MESSAGE -->
+
+          @if (message()) {
+
+            <p
+              class="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+              role="status"
+            >
+
+              {{ message() }}
+
+            </p>
+
+          }
+
+
+          <!-- ERROR -->
 
           @if (error()) {
 
@@ -241,13 +268,15 @@ import {
               class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700"
               role="alert"
             >
+
               {{ error() }}
+
             </p>
 
           }
 
 
-          <!-- Submit -->
+          <!-- SUBMIT -->
 
           <button
             type="submit"
@@ -261,10 +290,13 @@ import {
               [class.animate-spin]="loading()"
             />
 
+
             {{
-              registerMode()
-                ? 'Create account'
-                : 'Sign in'
+              loading()
+                ? 'Please wait...'
+                : registerMode()
+                  ? 'Create account'
+                  : 'Sign in'
             }}
 
           </button>
@@ -276,8 +308,8 @@ import {
           class="mt-6 text-center text-xs text-slate-400"
         >
 
-          Your account is secured with
-          email verification and JWT authentication.
+          Your account is protected with
+          JWT authentication.
 
         </p>
 
@@ -289,57 +321,85 @@ import {
 })
 export class AuthComponent {
 
-  readonly auth = inject(AuthService);
+  readonly auth =
+    inject(AuthService);
+
 
   readonly registerMode =
     signal(false);
 
+
   readonly loading =
     signal(false);
+
 
   readonly error =
     signal('');
 
 
+  readonly message =
+    signal('');
+
+
   fullName = '';
+
   email = '';
+
   password = '';
 
 
-  readonly FileSearch = FileSearch;
-  readonly LoaderCircle = LoaderCircle;
-  readonly LockKeyhole = LockKeyhole;
-  readonly Mail = Mail;
-  readonly UserRound = UserRound;
+  readonly FileSearch =
+    FileSearch;
+
+  readonly LoaderCircle =
+    LoaderCircle;
+
+  readonly LockKeyhole =
+    LockKeyhole;
+
+  readonly Mail =
+    Mail;
+
+  readonly UserRound =
+    UserRound;
 
 
-  switchMode(register: boolean): void {
+  switchMode(
+    register: boolean
+  ): void {
 
-    this.registerMode.set(register);
+    this.registerMode.set(
+      register
+    );
 
     this.error.set('');
 
+    this.message.set('');
   }
 
 
   submit(): void {
 
     this.loading.set(true);
+
     this.error.set('');
 
+    this.message.set('');
 
-    const request = this.registerMode()
 
-      ? this.auth.register(
-          this.fullName,
-          this.email,
-          this.password
-        )
+    const request =
+      this.registerMode()
 
-      : this.auth.login(
-          this.email,
-          this.password
-        );
+        ? this.auth.register(
+            this.fullName,
+            this.email,
+            this.password
+          )
+
+        : this.auth.login(
+            this.email,
+            this.password
+          );
 
 
     request.subscribe({
@@ -347,28 +407,42 @@ export class AuthComponent {
       next: response => {
 
         /*
-         * Registration normally requires
+         * Registration requiring
          * email verification.
          */
-
         if (
-          this.registerMode() &&
-          !response.emailVerified
+          this.registerMode()
         ) {
 
-          this.error.set(
-            response.message ||
-            'Account created. Please verify your email before signing in.'
-          );
+          if (
+            response.emailVerified
+          ) {
+
+            this.message.set(
+              response.message ||
+              'Account created successfully.'
+            );
+
+          } else {
+
+            this.message.set(
+              response.message ||
+              'Account created. Please check your email and verify your account.'
+            );
+
+          }
 
           return;
         }
 
+
         /*
          * Login successful.
-         * Navigation should be handled by
-         * your application/router.
          */
+        this.message.set(
+          response.message ||
+          'Login successful.'
+        );
 
       },
 
@@ -380,105 +454,114 @@ export class AuthComponent {
           response
         );
 
+
         this.error.set(
-          this.getErrorMessage(response)
+          this.getErrorMessage(
+            response
+          )
         );
 
-        this.loading.set(false);
 
+        this.loading.set(false);
       },
 
 
       complete: () => {
 
         this.loading.set(false);
-
       }
 
     });
-
   }
 
 
   private getErrorMessage(
     response: {
-      error?: {
-        message?: string;
-        validationErrors?: Record<string, string>;
-      } | string;
+      error?:
+        | {
+            message?: string;
+            validationErrors?:
+              Record<string, string>;
+          }
+        | string;
 
       status?: number;
     }
   ): string {
 
+    /*
+     * Plain backend response
+     */
     if (
       typeof response.error === 'string' &&
       response.error.trim()
     ) {
 
       return response.error;
-
     }
 
 
+    /*
+     * JSON message
+     */
     if (
       typeof response.error === 'object' &&
       response.error?.message
     ) {
 
       return response.error.message;
-
     }
 
 
+    /*
+     * Validation errors
+     */
     const validationErrors =
       typeof response.error === 'object'
         ? response.error?.validationErrors
         : undefined;
 
 
-    if (validationErrors) {
+    if (
+      validationErrors
+    ) {
 
       return Object.values(
         validationErrors
       ).join(' ');
-
     }
 
 
-    if (response.status === 0) {
+    /*
+     * Backend unreachable / CORS / network.
+     */
+    if (
+      response.status === 0
+    ) {
 
       return (
         'Cannot reach the backend. ' +
-        'Please check the backend deployment.'
+        'Please check the Render backend and CORS configuration.'
       );
-
     }
 
 
-    if (response.status === 401) {
+    /*
+     * Unauthorized
+     */
+    if (
+      response.status === 401
+    ) {
 
       return (
-        'Invalid email or password, ' +
-        'or your email has not been verified.'
+        'Invalid email/password, or your email has not been verified.'
       );
-
-    }
-
-
-    if (response.status === 403) {
-
-      return (
-        'Access denied. Please verify your email first.'
-      );
-
     }
 
 
     return (
       'Authentication failed. Please check your details.'
     );
-
   }
 
 }

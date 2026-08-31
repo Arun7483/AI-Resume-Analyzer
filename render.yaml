@@ -1,49 +1,34 @@
 services:
 
   # =====================================================
-  # BACKEND - SPRING BOOT API
+  # BACKEND - SPRING BOOT
   # =====================================================
 
   - type: web
     name: resume-analyzer-api
     runtime: docker
     rootDir: backend
-    dockerfilePath: ./Dockerfile
-    plan: free
-    region: oregon
-    autoDeployTrigger: commit
+
     healthCheckPath: /actuator/health
 
     envVars:
+      - key: PORT
+        value: 8080
+
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
 
       # -------------------------------------------------
-      # AIVEN POSTGRESQL
+      # DATABASE
       # -------------------------------------------------
 
       - key: DATABASE_URL
         sync: false
 
-      - key: DB_USERNAME
+      - key: DATABASE_USERNAME
         sync: false
 
-      - key: DB_PASSWORD
-        sync: false
-
-      # -------------------------------------------------
-      # GROQ
-      # -------------------------------------------------
-
-      - key: GROQ_API_KEY
-        sync: false
-
-      # -------------------------------------------------
-      # GMAIL SMTP
-      # -------------------------------------------------
-
-      - key: MAIL_USERNAME
-        sync: false
-
-      - key: MAIL_PASSWORD
+      - key: DATABASE_PASSWORD
         sync: false
 
       # -------------------------------------------------
@@ -51,10 +36,10 @@ services:
       # -------------------------------------------------
 
       - key: JWT_SECRET
-        generateValue: true
+        sync: false
 
       - key: JWT_EXPIRATION
-        value: "3600000"
+        value: 86400000
 
       # -------------------------------------------------
       # CORS
@@ -64,18 +49,30 @@ services:
         value: https://resume-pulse-frontend-bbep.onrender.com
 
       # -------------------------------------------------
-      # BACKEND URL
+      # GROQ
       # -------------------------------------------------
 
-      - key: APP_BACKEND_URL
-        value: https://resume-analyzer-api-bbep.onrender.com
+      - key: GROQ_API_KEY
+        sync: false
 
       # -------------------------------------------------
-      # FILE STORAGE
+      # EMAIL / SMTP
       # -------------------------------------------------
 
-      - key: RESUME_STORAGE_PATH
-        value: ./uploads
+      - key: MAIL_HOST
+        sync: false
+
+      - key: MAIL_PORT
+        value: 587
+
+      - key: MAIL_USERNAME
+        sync: false
+
+      - key: MAIL_PASSWORD
+        sync: false
+
+      - key: MAIL_FROM
+        sync: false
 
 
   # =====================================================
@@ -83,13 +80,18 @@ services:
   # =====================================================
 
   - type: web
-    name: resume-pulse-frontend
+    name: resume-pulse-frontend-bbep
     runtime: static
     rootDir: frontend
 
     buildCommand: npm install && npm run build
 
-    staticPublishPath: ./dist
+    staticPublishPath: ./dist/resume-pulse
+
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
 
     envVars:
       - key: API_URL

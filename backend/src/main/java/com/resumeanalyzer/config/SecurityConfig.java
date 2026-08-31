@@ -1,7 +1,5 @@
 package com.resumeanalyzer.config;
 
-import jakarta.servlet.http.HttpServletResponse;
-
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +26,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -36,80 +35,110 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-
     private final JwtAuthenticationFilter jwtFilter;
+
+
+    @Value("${app.cors.allowed-origin}")
+    private String allowedOrigin;
 
 
     @Bean
     SecurityFilterChain filterChain(
             HttpSecurity http,
             CorsConfigurationSource corsConfigurationSource
-    )
-            throws Exception {
-
+    ) throws Exception {
 
         return http
 
+            /*
+             * REST API does not use CSRF tokens.
+             */
             .csrf(csrf ->
                 csrf.disable()
             )
 
+
+            /*
+             * Enable CORS.
+             */
             .cors(cors ->
                 cors.configurationSource(
                     corsConfigurationSource
                 )
             )
 
+
+            /*
+             * JWT authentication is stateless.
+             */
             .sessionManagement(session ->
                 session.sessionCreationPolicy(
                     SessionCreationPolicy.STATELESS
                 )
             )
 
-            .exceptionHandling(exception ->
-                exception.authenticationEntryPoint(
-                    (request, response, ex) ->
-                        response.sendError(
-                            HttpServletResponse.SC_UNAUTHORIZED,
-                            "Authentication required"
-                        )
-                )
-            )
 
+            /*
+             * Authorization rules.
+             */
             .authorizeHttpRequests(auth -> auth
 
+                /*
+                 * Browser CORS preflight.
+                 */
                 .requestMatchers(
                     HttpMethod.OPTIONS,
                     "/**"
                 )
                 .permitAll()
 
+
+                /*
+                 * Login/register/verification.
+                 */
                 .requestMatchers(
                     "/api/v1/auth/**"
                 )
                 .permitAll()
 
-                .requestMatchers(
-                    "/error"
-                )
-                .permitAll()
 
+                /*
+                 * Health check.
+                 */
                 .requestMatchers(
                     "/actuator/health"
                 )
                 .permitAll()
 
+
+                /*
+                 * Error endpoint.
+                 */
+                .requestMatchers(
+                    "/error"
+                )
+                .permitAll()
+
+
+                /*
+                 * Everything else needs JWT.
+                 */
                 .anyRequest()
                 .authenticated()
             )
 
+
+            /*
+             * JWT filter runs before Spring's
+             * username/password filter.
+             */
             .addFilterBefore(
                 jwtFilter,
                 UsernamePasswordAuthenticationFilter.class
             )
 
-            .build();
 
+            .build();
     }
 
 
@@ -117,29 +146,28 @@ public class SecurityConfig {
     PasswordEncoder passwordEncoder() {
 
         return new BCryptPasswordEncoder();
-
     }
 
 
     @Bean
-    CorsConfigurationSource corsConfigurationSource(
-            @Value("${app.cors.allowed-origin:*}")
-            String allowedOrigin
-    ) {
+    CorsConfigurationSource corsConfigurationSource() {
 
         CorsConfiguration configuration =
             new CorsConfiguration();
 
 
         /*
-         * Your deployed Angular frontend.
+         * Allow the Render frontend.
+         *
+         * Multiple origins can be comma-separated.
          */
-
-        configuration.setAllowedOriginPatterns(
-            List.of(
-                allowedOrigin,
-                "https://*.onrender.com"
+        configuration.setAllowedOrigins(
+            Arrays.stream(
+                allowedOrigin.split(",")
             )
+            .map(String::trim)
+            .filter(origin -> !origin.isBlank())
+            .toList()
         );
 
 
@@ -160,6 +188,11 @@ public class SecurityConfig {
         );
 
 
+        configuration.setExposedHeaders(
+            List.of("Authorization")
+        );
+
+
         configuration.setAllowCredentials(
             true
         );
@@ -176,7 +209,5 @@ public class SecurityConfig {
 
 
         return source;
-
     }
-
 }

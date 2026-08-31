@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+
 import java.util.List;
 
 
@@ -52,6 +53,9 @@ public class JwtAuthenticationFilter
             );
 
 
+        /*
+         * Only process Bearer tokens.
+         */
         if (
             header != null &&
             header.startsWith("Bearer ") &&
@@ -62,44 +66,53 @@ public class JwtAuthenticationFilter
 
 
             String token =
-                header.substring(7);
+                header
+                    .substring(7)
+                    .trim();
 
 
-            if (jwtService.isValid(token)) {
+            if (
+                !token.isBlank() &&
+                jwtService.isValid(token)
+            ) {
+
 
                 String email =
-                    jwtService.subject(token);
+                    jwtService.subject(
+                        token
+                    );
 
 
-                users.findByEmailIgnoreCase(email)
-                    .ifPresent(user -> {
-
-                        var authorities =
-                            List.of(
-                                new SimpleGrantedAuthority(
-                                    user.getRole().name()
-                                )
-                            );
+                users.findByEmailIgnoreCase(
+                    email
+                )
+                .ifPresent(user -> {
 
 
-                        var authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                user,
-                                null,
-                                authorities
-                            );
+                    var authority =
+                        new SimpleGrantedAuthority(
+                            user
+                                .getRole()
+                                .name()
+                        );
 
 
-                        SecurityContextHolder
-                            .getContext()
-                            .setAuthentication(
-                                authentication
-                            );
+                    var authentication =
+                        new UsernamePasswordAuthenticationToken(
+                            user,
+                            null,
+                            List.of(authority)
+                        );
 
-                    });
 
+                    SecurityContextHolder
+                        .getContext()
+                        .setAuthentication(
+                            authentication
+                        );
+
+                });
             }
-
         }
 
 
@@ -107,7 +120,5 @@ public class JwtAuthenticationFilter
             request,
             response
         );
-
     }
-
 }
