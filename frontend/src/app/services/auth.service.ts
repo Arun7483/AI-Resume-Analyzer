@@ -1,7 +1,19 @@
-import { HttpClient, HttpInterceptorFn } from '@angular/common/http';
-import { computed, inject, Injectable, signal } from '@angular/core';
+import {
+  HttpClient,
+  HttpInterceptorFn
+} from '@angular/common/http';
+
+import {
+  computed,
+  inject,
+  Injectable,
+  signal
+} from '@angular/core';
+
 import { tap } from 'rxjs';
+
 import { API_BASE_URL } from '../api.config';
+
 
 export interface AuthResponse {
   accessToken: string | null;
@@ -12,6 +24,7 @@ export interface AuthResponse {
   emailVerified: boolean;
   message: string;
 }
+
 
 @Injectable({
   providedIn: 'root'
@@ -35,46 +48,65 @@ export class AuthService {
     () => !!this.token()
   );
 
+
   login(email: string, password: string) {
-    return this.http
-      .post<AuthResponse>(
-        `${API_BASE_URL}/api/v1/auth/login`,
-        {
-          email,
-          password
+
+    return this.http.post<AuthResponse>(
+      `${API_BASE_URL}/api/v1/auth/login`,
+      {
+        email: email.trim(),
+        password
+      }
+    ).pipe(
+      tap(response => {
+
+        if (response.accessToken) {
+          this.store(response);
         }
-      )
-      .pipe(
-        tap(response => this.store(response))
-      );
+
+      })
+    );
   }
+
 
   register(
     fullName: string,
     email: string,
     password: string
   ) {
-    return this.http
-      .post<AuthResponse>(
-        `${API_BASE_URL}/api/v1/auth/register`,
-        {
-          fullName,
-          email,
-          password
+
+    return this.http.post<AuthResponse>(
+      `${API_BASE_URL}/api/v1/auth/register`,
+      {
+        fullName: fullName.trim(),
+        email: email.trim(),
+        password
+      }
+    ).pipe(
+      tap(response => {
+
+        /*
+         * Do NOT automatically store a token when
+         * registration requires email verification.
+         */
+        if (response.emailVerified && response.accessToken) {
+          this.store(response);
         }
-      )
-      .pipe(
-        tap(response => this.store(response))
-      );
+
+      })
+    );
   }
 
+
   logout(): void {
+
     localStorage.removeItem(this.tokenKey);
     localStorage.removeItem(this.nameKey);
 
     this.token.set(null);
     this.fullName.set('');
   }
+
 
   private store(response: AuthResponse): void {
 
@@ -93,33 +125,41 @@ export class AuthService {
     );
 
     this.token.set(response.accessToken);
-    this.fullName.set(response.fullName ?? '');
+
+    this.fullName.set(
+      response.fullName ?? ''
+    );
   }
 }
 
 
-/**
+/*
  * JWT HTTP interceptor
  *
  * Automatically adds:
  *
- * Authorization: Bearer <JWT>
+ * Authorization: Bearer <token>
  *
- * to API requests when the user is logged in.
+ * to authenticated API requests.
  */
-export const authInterceptor: HttpInterceptorFn = (request, next) => {
+export const authInterceptor: HttpInterceptorFn = (
+  request,
+  next
+) => {
 
-  const token = localStorage.getItem('resume-pulse-token');
+  const token =
+    localStorage.getItem('resume-pulse-token');
 
   if (!token) {
     return next(request);
   }
 
-  const authenticatedRequest = request.clone({
-    setHeaders: {
-      Authorization: `Bearer ${token}`
-    }
-  });
+  const authenticatedRequest =
+    request.clone({
+      setHeaders: {
+        Authorization: `Bearer ${token}`
+      }
+    });
 
   return next(authenticatedRequest);
 };

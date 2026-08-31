@@ -1,140 +1,182 @@
 package com.resumeanalyzer.config;
 
 import jakarta.servlet.http.HttpServletResponse;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
 import org.springframework.http.HttpMethod;
+
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+
 import org.springframework.security.config.http.SessionCreationPolicy;
+
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
 import org.springframework.security.web.SecurityFilterChain;
+
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
+
 @Configuration
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    private final JwtAuthenticationFilter jwtFilter;
+
 
     @Bean
-    public SecurityFilterChain filterChain(
+    SecurityFilterChain filterChain(
             HttpSecurity http,
             CorsConfigurationSource corsConfigurationSource
-    ) throws Exception {
+    )
+            throws Exception {
 
-        http
-                // JWT APIs don't use CSRF tokens.
-                .csrf(csrf -> csrf.disable())
 
-                // Enable CORS.
-                .cors(cors -> cors.configurationSource(corsConfigurationSource))
+        return http
 
-                // No HTTP session.
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(
-                                SessionCreationPolicy.STATELESS
+            .csrf(csrf ->
+                csrf.disable()
+            )
+
+            .cors(cors ->
+                cors.configurationSource(
+                    corsConfigurationSource
+                )
+            )
+
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(
+                    SessionCreationPolicy.STATELESS
+                )
+            )
+
+            .exceptionHandling(exception ->
+                exception.authenticationEntryPoint(
+                    (request, response, ex) ->
+                        response.sendError(
+                            HttpServletResponse.SC_UNAUTHORIZED,
+                            "Authentication required"
                         )
                 )
+            )
 
-                // Return 401 instead of Spring's default login page.
-                .exceptionHandling(exception ->
-                        exception.authenticationEntryPoint(
-                                (request, response, authException) ->
-                                        response.sendError(
-                                                HttpServletResponse.SC_UNAUTHORIZED,
-                                                "Authentication required"
-                                        )
-                        )
+            .authorizeHttpRequests(auth -> auth
+
+                .requestMatchers(
+                    HttpMethod.OPTIONS,
+                    "/**"
                 )
+                .permitAll()
 
-                // API authorization rules.
-                .authorizeHttpRequests(auth -> auth
-
-                        // CORS preflight.
-                        .requestMatchers(
-                                HttpMethod.OPTIONS,
-                                "/**"
-                        ).permitAll()
-
-                        // Authentication endpoints.
-                        .requestMatchers(
-                                "/api/v1/auth/**"
-                        ).permitAll()
-
-                        // Health check for Render.
-                        .requestMatchers(
-                                "/actuator/health"
-                        ).permitAll()
-
-                        // Spring error endpoint.
-                        .requestMatchers(
-                                "/error"
-                        ).permitAll()
-
-                        // Everything else requires JWT.
-                        .anyRequest().authenticated()
+                .requestMatchers(
+                    "/api/v1/auth/**"
                 )
+                .permitAll()
 
-                // JWT filter must run before Spring's username/password filter.
-                .addFilterBefore(
-                        jwtAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class
-                );
+                .requestMatchers(
+                    "/error"
+                )
+                .permitAll()
 
-        return http.build();
+                .requestMatchers(
+                    "/actuator/health"
+                )
+                .permitAll()
+
+                .anyRequest()
+                .authenticated()
+            )
+
+            .addFilterBefore(
+                jwtFilter,
+                UsernamePasswordAuthenticationFilter.class
+            )
+
+            .build();
+
     }
 
+
     @Bean
-    public PasswordEncoder passwordEncoder() {
+    PasswordEncoder passwordEncoder() {
+
         return new BCryptPasswordEncoder();
+
     }
 
+
     @Bean
-    public CorsConfigurationSource corsConfigurationSource(
-            @Value("${app.cors.allowed-origin:*}") String allowedOrigin
+    CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origin:*}")
+            String allowedOrigin
     ) {
 
-        CorsConfiguration configuration = new CorsConfiguration();
+        CorsConfiguration configuration =
+            new CorsConfiguration();
+
+
+        /*
+         * Your deployed Angular frontend.
+         */
 
         configuration.setAllowedOriginPatterns(
-                List.of(allowedOrigin)
+            List.of(
+                allowedOrigin,
+                "https://*.onrender.com"
+            )
         );
+
 
         configuration.setAllowedMethods(
-                List.of(
-                        "GET",
-                        "POST",
-                        "PUT",
-                        "DELETE",
-                        "PATCH",
-                        "OPTIONS"
-                )
+            List.of(
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE",
+                "PATCH",
+                "OPTIONS"
+            )
         );
+
 
         configuration.setAllowedHeaders(
-                List.of("*")
+            List.of("*")
         );
 
-        configuration.setAllowCredentials(true);
+
+        configuration.setAllowCredentials(
+            true
+        );
+
 
         UrlBasedCorsConfigurationSource source =
-                new UrlBasedCorsConfigurationSource();
+            new UrlBasedCorsConfigurationSource();
+
 
         source.registerCorsConfiguration(
-                "/**",
-                configuration
+            "/**",
+            configuration
         );
 
+
         return source;
+
     }
+
 }
