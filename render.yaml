@@ -63,7 +63,7 @@ services:
       # -------------------------------------------------
 
       - key: MAIL_HOST
-        sync: false
+        value: smtp.gmail.com
 
       - key: MAIL_PORT
         value: 465
