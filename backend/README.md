@@ -13,9 +13,11 @@ export RESUME_STORAGE_PATH='/var/lib/resume-analyzer/uploads'
 export GROQ_API_KEY='...'
 export GROQ_MODEL='llama-3.3-70b-versatile'
 export MAIL_HOST='smtp.gmail.com'
-export MAIL_PORT='587'
+export MAIL_PORT='465'
 export MAIL_USERNAME='your-gmail-address'
 export MAIL_PASSWORD='your-gmail-app-password'
+export MAIL_SSL_ENABLE='true'
+export MAIL_STARTTLS_ENABLE='false'
 ```
 
 Run with `mvn spring-boot:run`. Flyway creates the PostgreSQL schema. Set `CORS_ALLOWED_ORIGIN` to the deployed frontend URL.
@@ -30,7 +32,7 @@ DB_PASSWORD=YOUR_AIVEN_PASSWORD
 
 Enter the actual values in Render. Do not enter `${DATABASE_USERNAME}`, `${DATABASE_PASSWORD}`, or the literal `CLICK_TO:REVEAL_PASSWORD`.
 
-Render runs the `prod,mail` profiles so signup verification emails are sent. For Gmail, `MAIL_PASSWORD` must be a Google app password, not the normal Gmail password.
+Render runs the `prod,mail` profiles so signup verification emails are sent. The deployment uses Gmail implicit TLS on port 465 because the previous connection to port 587 timed out. For Gmail, `MAIL_PASSWORD` must be a Google app password, not the normal Gmail password.
 
 ## Email verification (local Gmail setup)
 
