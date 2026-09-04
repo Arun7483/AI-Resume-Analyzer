@@ -38,6 +38,18 @@ public class AuthController {
         );
     }
 
+        @PostMapping("/resend-verification")
+        public ResponseEntity<String> resendVerification(
+                        @Valid @RequestBody EmailVerificationRequest request
+        ) {
+
+                authService.resendVerification(request.email());
+
+                return ResponseEntity.ok(
+                                "If the account exists and is not verified, a new verification email has been sent."
+                );
+        }
+
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody AuthRequest request
