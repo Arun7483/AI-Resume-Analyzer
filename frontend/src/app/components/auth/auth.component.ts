@@ -559,6 +559,17 @@ export class AuthComponent {
     }
 
 
+    if (
+      response.status === 503
+    ) {
+
+      return (
+        'Your account was not created because the verification email service is unavailable. ' +
+        'Please try again after the email settings are fixed.'
+      );
+    }
+
+
     return (
       'Authentication failed. Please check your details.'
     );
