@@ -16,13 +16,19 @@ services:
         value: 8080
 
       - key: SPRING_PROFILES_ACTIVE
-        value: prod
+        value: prod,mail
 
       # -------------------------------------------------
       # DATABASE
       # -------------------------------------------------
 
       - key: DATABASE_URL
+        sync: false
+
+      - key: DB_USERNAME
+        sync: false
+
+      - key: DB_PASSWORD
         sync: false
 
       # -------------------------------------------------

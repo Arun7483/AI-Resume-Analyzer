@@ -5,22 +5,32 @@ Java 21 / Spring Boot API with stateless JWT authentication, PostgreSQL persiste
 ## Required environment
 
 ```bash
-export DATABASE_URL='jdbc:postgresql://resume_app:change-me@localhost:5432/resume_analyzer'
+export DATABASE_URL='jdbc:postgresql://localhost:5432/resume_analyzer'
+export DB_USERNAME='avnadmin'
+export DB_PASSWORD='change-me'
 export JWT_SECRET="$(openssl rand -base64 64)"
 export RESUME_STORAGE_PATH='/var/lib/resume-analyzer/uploads'
 export GROQ_API_KEY='...'
 export GROQ_MODEL='llama-3.3-70b-versatile'
+export MAIL_HOST='smtp.gmail.com'
+export MAIL_PORT='587'
+export MAIL_USERNAME='your-gmail-address'
+export MAIL_PASSWORD='your-gmail-app-password'
 ```
 
 Run with `mvn spring-boot:run`. Flyway creates the PostgreSQL schema. Set `CORS_ALLOWED_ORIGIN` to the deployed frontend URL.
 
-For the Aiven database, copy the revealed values from Aiven into Render as one secret named `DATABASE_URL`. Convert its Service URI from `postgres://` to `jdbc:postgresql://` and keep the SSL query parameter:
+For the Aiven database, configure these three Render variables. Convert its Service URI from `postgres://` to a JDBC URL without credentials and keep the SSL query parameter:
 
 ```text
-jdbc:postgresql://avnadmin:YOUR_PASSWORD@pg-2ea8c8c-ruas58876-dde6.i.aivencloud.com:16477/defaultdb?sslmode=require
+DATABASE_URL=jdbc:postgresql://pg-2ea8c8c-ruas58876-dde6.i.aivencloud.com:16477/defaultdb?sslmode=require
+DB_USERNAME=avnadmin
+DB_PASSWORD=YOUR_AIVEN_PASSWORD
 ```
 
-Do not enter the literal `CLICK_TO:REVEAL_PASSWORD`. Do not add separate `DATABASE_USERNAME` or `DATABASE_PASSWORD` variables; the application reads the credentials from this URL.
+Enter the actual values in Render. Do not enter `${DATABASE_USERNAME}`, `${DATABASE_PASSWORD}`, or the literal `CLICK_TO:REVEAL_PASSWORD`.
+
+Render runs the `prod,mail` profiles so signup verification emails are sent. For Gmail, `MAIL_PASSWORD` must be a Google app password, not the normal Gmail password.
 
 ## Email verification (local Gmail setup)
 
