@@ -1,20 +1,20 @@
 # Resume Analyzer API
 
-Java 21 / Spring Boot API with stateless JWT authentication, MySQL persistence, Apache Tika document extraction, and Spring AI analysis/chat.
+Java 21 / Spring Boot API with stateless JWT authentication, PostgreSQL persistence, Apache Tika document extraction, and Spring AI analysis/chat.
 
 ## Required environment
 
 ```bash
-export DATABASE_URL='jdbc:mysql://localhost:3306/resume_analyzer?createDatabaseIfNotExist=true&serverTimezone=UTC'
-export DB_USERNAME='resume_app'
-export DB_PASSWORD='change-me'
+export DATABASE_URL='jdbc:postgresql://localhost:5432/resume_analyzer'
+export DATABASE_USERNAME='resume_app'
+export DATABASE_PASSWORD='change-me'
 export JWT_SECRET="$(openssl rand -base64 64)"
 export RESUME_STORAGE_PATH='/var/lib/resume-analyzer/uploads'
 export GROQ_API_KEY='...'
 export GROQ_MODEL='llama-3.3-70b-versatile'
 ```
 
-Run with `mvn spring-boot:run`. Flyway creates the schema. Set `CORS_ALLOWED_ORIGIN` to the deployed frontend URL. On Render, use a managed MySQL-compatible database or an external MySQL provider; the migration uses MySQL JSON, ENUM, and InnoDB features.
+Run with `mvn spring-boot:run`. Flyway creates the PostgreSQL schema. Set `CORS_ALLOWED_ORIGIN` to the deployed frontend URL. On Render, set `DATABASE_URL` to the database's JDBC PostgreSQL URL, for example `jdbc:postgresql://host:5432/database`, and provide its username and password separately.
 
 ## Email verification (local Gmail setup)
 
