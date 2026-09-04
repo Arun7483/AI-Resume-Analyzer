@@ -7,6 +7,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -17,6 +18,9 @@ public class EmailVerificationService {
     @Value("${app.backend-url:http://localhost:8080}")
     private String backendUrl;
 
+    @Value("${MAIL_FROM:${spring.mail.username:}}")
+    private String mailFrom;
+
     public void send(User user) {
         String link = backendUrl.replaceAll("/$", "") + "/api/v1/auth/verify?token=" + user.getVerificationToken();
         JavaMailSender sender = mailSender.getIfAvailable();
@@ -25,9 +29,18 @@ public class EmailVerificationService {
             return;
         }
         SimpleMailMessage message = new SimpleMailMessage();
+        if (!mailFrom.isBlank()) {
+            message.setFrom(mailFrom);
+        }
         message.setTo(user.getEmail());
         message.setSubject("Verify your ResumePulse account");
         message.setText("Hello " + user.getFullName() + ",\n\nVerify your ResumePulse account here:\n" + link + "\n\nThis link expires in 24 hours.");
-        sender.send(message);
+        try {
+            sender.send(message);
+            log.info("Verification email sent successfully to {}", user.getEmail());
+        } catch (MailException exception) {
+            log.error("Verification email could not be sent to {}", user.getEmail(), exception);
+            throw new IllegalStateException("Verification email could not be sent. Check the SMTP configuration.", exception);
+        }
     }
 }

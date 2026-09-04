@@ -112,6 +112,17 @@ public class SecurityConfig {
 
 
                 /*
+                 * OpenAPI specification and Swagger UI.
+                 */
+                .requestMatchers(
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html"
+                )
+                .permitAll()
+
+
+                /*
                  * Error endpoint.
                  */
                 .requestMatchers(
