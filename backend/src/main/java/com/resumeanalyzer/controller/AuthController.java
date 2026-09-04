@@ -2,6 +2,7 @@ package com.resumeanalyzer.controller;
 
 import com.resumeanalyzer.dto.AuthRequest;
 import com.resumeanalyzer.dto.AuthResponse;
+import com.resumeanalyzer.dto.EmailVerificationRequest;
 import com.resumeanalyzer.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
