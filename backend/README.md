@@ -12,6 +12,7 @@ export JWT_SECRET="$(openssl rand -base64 64)"
 export RESUME_STORAGE_PATH='/var/lib/resume-analyzer/uploads'
 export GROQ_API_KEY='...'
 export GROQ_MODEL='llama-3.3-70b-versatile'
+export RESEND_API_KEY='re_...'
 export MAIL_HOST='smtp.gmail.com'
 export MAIL_PORT='465'
 export MAIL_USERNAME='your-gmail-address'
@@ -32,7 +33,7 @@ DB_PASSWORD=YOUR_AIVEN_PASSWORD
 
 Enter the actual values in Render. Do not enter `${DATABASE_USERNAME}`, `${DATABASE_PASSWORD}`, or the literal `CLICK_TO:REVEAL_PASSWORD`.
 
-Render runs the `prod,mail` profiles so signup verification emails are sent. The deployment uses Gmail implicit TLS on port 465 because the previous connection to port 587 timed out. For Gmail, `MAIL_PASSWORD` must be a Google app password, not the normal Gmail password.
+Render runs the `prod,mail` profiles so signup verification emails are sent. If `RESEND_API_KEY` is configured, verification uses Resend's HTTPS API and does not depend on Render allowing SMTP connections. Set `MAIL_FROM` to a sender verified in Resend. SMTP remains available as a fallback when `RESEND_API_KEY` is empty.
 
 ## Email verification (local Gmail setup)
 

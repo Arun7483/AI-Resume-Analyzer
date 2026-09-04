@@ -9,6 +9,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 @Service
 @RequiredArgsConstructor
@@ -21,8 +22,21 @@ public class EmailVerificationService {
     @Value("${MAIL_FROM:${spring.mail.username:}}")
     private String mailFrom;
 
+        @Value("${RESEND_API_KEY:}")
+        private String resendApiKey;
+
+        private final RestClient restClient = RestClient.builder()
+            .baseUrl("https://api.resend.com")
+            .build();
+
     public void send(User user) {
         String link = backendUrl.replaceAll("/$", "") + "/api/v1/auth/verify?token=" + user.getVerificationToken();
+
+        if (!resendApiKey.isBlank()) {
+            sendWithResend(user, link);
+            return;
+        }
+
         JavaMailSender sender = mailSender.getIfAvailable();
         if (sender == null) {
             log.warn("SMTP is not configured. Verify {} using this local link: {}", user.getEmail(), link);
@@ -41,6 +55,27 @@ public class EmailVerificationService {
         } catch (MailException exception) {
             log.error("Verification email could not be sent to {}", user.getEmail(), exception);
             throw new IllegalStateException("Verification email could not be sent. Check the SMTP configuration.", exception);
+        }
+    }
+
+    private void sendWithResend(User user, String link) {
+        try {
+            restClient.post()
+                    .uri("/emails")
+                    .header("Authorization", "Bearer " + resendApiKey)
+                    .body(java.util.Map.of(
+                            "from", mailFrom,
+                            "to", java.util.List.of(user.getEmail()),
+                            "subject", "Verify your ResumePulse account",
+                            "text", "Hello " + user.getFullName() + ",\n\nVerify your ResumePulse account here:\n"
+                                    + link + "\n\nThis link expires in 24 hours."
+                    ))
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("Verification email sent successfully to {} using Resend", user.getEmail());
+        } catch (RuntimeException exception) {
+            log.error("Verification email could not be sent to {} using Resend", user.getEmail(), exception);
+            throw new IllegalStateException("Verification email could not be sent. Check RESEND_API_KEY and MAIL_FROM.", exception);
         }
     }
 }
