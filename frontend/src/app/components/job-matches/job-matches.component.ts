@@ -25,7 +25,7 @@ import { JobsService } from '../../services/jobs.service';
           <lucide-icon [img]="LoaderCircle" [size]="24" class="mb-3 animate-spin text-brand-500" />
           Finding active roles for your profile...
         </div>
-      } @else if (jobs.error()) {
+      } @else if (jobs.error() && !jobs.jobs().length) {
         <div class="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">{{ jobs.error() }}</div>
       } @else if (!jobs.jobs().length) {
         <div class="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
