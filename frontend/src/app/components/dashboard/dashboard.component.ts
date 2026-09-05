@@ -1,6 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Bell, BriefcaseBusiness, FileSearch, HelpCircle, LogOut, UserRound, LucideAngularModule } from 'lucide-angular';
+import { BriefcaseBusiness, FileSearch, LogOut, UserRound, LucideAngularModule } from 'lucide-angular';
 import { AnalysisDashboardComponent } from '../analysis-dashboard/analysis-dashboard.component';
 import { AiBotComponent } from '../ai-bot/ai-bot.component';
 import { ResumeUploadComponent } from '../resume-upload/resume-upload.component';
@@ -33,14 +33,11 @@ import { JobMatchesComponent } from '../job-matches/job-matches.component';
             <button type="button" class="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold" [class.bg-brand-50]="activeView() === 'jobs'" [class.text-brand-700]="activeView() === 'jobs'" (click)="showJobs()"><lucide-icon [img]="BriefcaseBusiness" [size]="14" /> Jobs</button>
           </div>
           <div class="ml-auto flex items-center gap-2">
-            <lucide-icon [img]="HelpCircle" class="hidden text-slate-400 sm:block" />
-            <lucide-icon [img]="Bell" class="hidden text-slate-400 sm:block" />
-            <span class="ml-2 grid size-8 place-items-center rounded-full bg-brand-500 text-xs font-bold text-white">
-              {{ (auth.fullName() || 'U').charAt(0).toUpperCase() }}
-            </span>
-            <button type="button" class="hidden text-left sm:block" (click)="showProfile()">
-              <span class="block text-sm font-bold">{{ auth.fullName() || 'Account' }}</span>
-              <span class="block text-xs text-slate-400">Profile</span>
+            <button type="button" class="flex items-center gap-2 rounded-xl border border-slate-200 px-2 py-1.5 text-left hover:border-brand-200 hover:bg-brand-50" (click)="showProfile()" aria-label="Open user profile">
+              <span class="grid size-8 place-items-center rounded-full bg-brand-600 text-xs font-bold text-white">
+                {{ (auth.fullName() || 'U').charAt(0).toUpperCase() }}
+              </span>
+              <span class="hidden sm:block"><span class="block text-sm font-bold text-slate-900">{{ auth.fullName() || 'Account' }}</span><span class="block text-xs text-slate-400">Profile</span></span>
             </button>
             <button type="button" class="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600" (click)="logout()" aria-label="Log out">
               <lucide-icon [img]="LogOut" [size]="15" />
@@ -93,8 +90,6 @@ export class DashboardComponent implements OnInit {
   readonly resumeService = inject(ResumeService);
   readonly FileSearch = FileSearch;
   readonly BriefcaseBusiness = BriefcaseBusiness;
-  readonly HelpCircle = HelpCircle;
-  readonly Bell = Bell;
   readonly LogOut = LogOut;
   readonly UserRound = UserRound;
   

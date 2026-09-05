@@ -28,20 +28,27 @@ Run with `mvn spring-boot:run`. Flyway creates the PostgreSQL schema. Set `CORS_
 
 ### Run locally from IntelliJ IDEA
 
-The backend needs the Aiven database values when running locally. In IntelliJ, open **Run > Edit Configurations**, select the backend application, and add these environment variables:
+The repository includes `src/main/resources/application-local.properties` for IntelliJ local development. Open **Run > Edit Configurations**, select the backend application, set **Active profiles** to `local`, and add your database and optional AI values as environment variables:
 
 ```text
-DATABASE_URL=jdbc:postgresql://pg-2ea8c8c-ruas58876-dde6.i.aivencloud.com:16477/defaultdb?sslmode=require
-DB_USERNAME=avnadmin
-DB_PASSWORD=YOUR_AIVEN_PASSWORD
+SPRING_PROFILES_ACTIVE=local
+DATABASE_URL=jdbc:postgresql://localhost:5432/resume_analyzer
+DB_USERNAME=postgres
+DB_PASSWORD=YOUR_POSTGRES_PASSWORD
 JWT_SECRET=YOUR_LOCAL_LONG_RANDOM_SECRET
 CORS_ALLOWED_ORIGIN=http://localhost:4200
 BACKEND_URL=http://localhost:8080
 FRONTEND_URL=http://localhost:4200
 GROQ_API_KEY=YOUR_GROQ_KEY
 GROQ_MODEL=llama-3.3-70b-versatile
-RESEND_API_KEY=YOUR_RESEND_KEY
-MAIL_FROM=YOUR_VERIFIED_RESEND_SENDER
+```
+
+For the hosted Aiven database, replace only the database values with:
+
+```text
+DATABASE_URL=jdbc:postgresql://pg-2ea8c8c-ruas58876-dde6.i.aivencloud.com:16477/defaultdb?sslmode=require
+DB_USERNAME=avnadmin
+DB_PASSWORD=YOUR_AIVEN_PASSWORD
 ```
 
 Alternatively, start it from PowerShell after setting the same variables:

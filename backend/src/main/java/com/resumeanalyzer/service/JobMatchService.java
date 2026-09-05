@@ -92,6 +92,15 @@ public class JobMatchService {
         return ranked.isEmpty() ? fallbackJobs(resumeText) : ranked;
     }
 
+    public List<JobMatchDto> fallbackMatches() {
+        try {
+            Resume resume = resumes.findTopByUserIdOrderByUploadedAtDesc(currentUser.require().getId()).orElse(null);
+            return fallbackJobs(resume == null || resume.getRawText() == null ? "" : resume.getRawText());
+        } catch (RuntimeException exception) {
+            return fallbackJobs("");
+        }
+    }
+
     private List<JobMatchDto> fallbackJobs(String resumeText) {
         String normalized = resumeText.toLowerCase(Locale.ROOT);
         List<String> roles = detectRoles(normalized);
