@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +37,9 @@ public class JobMatchService {
             .baseUrl("https://www.arbeitnow.com/api/job-board-api")
             .build();
 
+        @Value("${app.jobs.feed-url:https://www.arbeitnow.com/api/job-board-api}")
+        private String jobsFeedUrl;
+
     public List<JobMatchDto> findMatches() {
         Resume resume = resumes.findTopByUserIdOrderByUploadedAtDesc(currentUser.require().getId())
                 .orElse(null);
@@ -46,7 +50,7 @@ public class JobMatchService {
 
         JsonNode root;
         try {
-            root = jobsClient.get().retrieve().body(JsonNode.class);
+            root = RestClient.builder().build().get().uri(jobsFeedUrl).retrieve().body(JsonNode.class);
         } catch (RestClientException exception) {
             return List.of();
         }
