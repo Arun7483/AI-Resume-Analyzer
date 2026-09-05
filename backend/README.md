@@ -26,6 +26,40 @@ export MAIL_STARTTLS_ENABLE='false'
 
 Run with `mvn spring-boot:run`. Flyway creates the PostgreSQL schema. Set `CORS_ALLOWED_ORIGIN` to the deployed frontend URL.
 
+### Run locally from IntelliJ IDEA
+
+The backend needs the Aiven database values when running locally. In IntelliJ, open **Run > Edit Configurations**, select the backend application, and add these environment variables:
+
+```text
+DATABASE_URL=jdbc:postgresql://pg-2ea8c8c-ruas58876-dde6.i.aivencloud.com:16477/defaultdb?sslmode=require
+DB_USERNAME=avnadmin
+DB_PASSWORD=YOUR_AIVEN_PASSWORD
+JWT_SECRET=YOUR_LOCAL_LONG_RANDOM_SECRET
+CORS_ALLOWED_ORIGIN=http://localhost:4200
+BACKEND_URL=http://localhost:8080
+FRONTEND_URL=http://localhost:4200
+GROQ_API_KEY=YOUR_GROQ_KEY
+GROQ_MODEL=llama-3.3-70b-versatile
+RESEND_API_KEY=YOUR_RESEND_KEY
+MAIL_FROM=YOUR_VERIFIED_RESEND_SENDER
+```
+
+Alternatively, start it from PowerShell after setting the same variables:
+
+```powershell
+cd backend
+$env:DATABASE_URL = 'jdbc:postgresql://pg-2ea8c8c-ruas58876-dde6.i.aivencloud.com:16477/defaultdb?sslmode=require'
+$env:DB_USERNAME = 'avnadmin'
+$env:DB_PASSWORD = 'YOUR_AIVEN_PASSWORD'
+$env:JWT_SECRET = 'YOUR_LOCAL_LONG_RANDOM_SECRET'
+$env:CORS_ALLOWED_ORIGIN = 'http://localhost:4200'
+$env:BACKEND_URL = 'http://localhost:8080'
+$env:FRONTEND_URL = 'http://localhost:4200'
+mvn spring-boot:run
+```
+
+The local JWT fallback is only for development. Never use it in Render; keep a strong `JWT_SECRET` configured there.
+
 For the Aiven database, configure these three Render variables. Convert its Service URI from `postgres://` to a JDBC URL without credentials and keep the SSL query parameter:
 
 ```text
