@@ -38,7 +38,11 @@ public class JobMatchService {
 
     public List<JobMatchDto> findMatches() {
         Resume resume = resumes.findTopByUserIdOrderByUploadedAtDesc(currentUser.require().getId())
-                .orElseThrow(() -> new IllegalStateException("Upload a resume before viewing job matches"));
+                .orElse(null);
+
+        if (resume == null || resume.getRawText() == null || resume.getRawText().isBlank()) {
+            return List.of();
+        }
 
         JsonNode root;
         try {
@@ -53,18 +57,22 @@ public class JobMatchService {
         Set<String> resumeWords = words(resume.getRawText());
         List<JobMatchDto> matches = new ArrayList<>();
         for (JsonNode job : root.path("data")) {
-            String title = text(job, "title");
-            String company = text(job, "company_name");
-            String location = text(job, "location");
-            String description = text(job, "description");
-            String applyUrl = text(job, "url");
-            if (title.isBlank() || applyUrl.isBlank()) {
-                continue;
+            try {
+                String title = text(job, "title");
+                String company = text(job, "company_name");
+                String location = text(job, "location");
+                String description = text(job, "description");
+                String applyUrl = text(job, "url");
+                if (title.isBlank() || applyUrl.isBlank()) {
+                    continue;
+                }
+                Set<String> jobWords = words(title + " " + description);
+                long overlap = jobWords.stream().filter(resumeWords::contains).count();
+                int score = Math.min(98, Math.max(25, 25 + (int) Math.round(73.0 * overlap / Math.max(1, Math.min(12, jobWords.size())))));
+                matches.add(new JobMatchDto(title, company, location, clean(description), applyUrl, score, job.path("remote").asBoolean(false)));
+            } catch (RuntimeException ignored) {
+                // Skip malformed third-party listings and keep the other jobs usable.
             }
-            Set<String> jobWords = words(title + " " + description);
-            long overlap = jobWords.stream().filter(resumeWords::contains).count();
-            int score = Math.min(98, Math.max(25, 25 + (int) Math.round(73.0 * overlap / Math.max(1, Math.min(12, jobWords.size())))));
-            matches.add(new JobMatchDto(title, company, location, clean(description), applyUrl, score, job.path("remote").asBoolean(false)));
         }
         return matches.stream()
                 .sorted(Comparator.comparingInt(JobMatchDto::matchPercentage).reversed())
