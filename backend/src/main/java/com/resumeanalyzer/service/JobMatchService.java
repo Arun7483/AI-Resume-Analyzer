@@ -218,7 +218,7 @@ public class JobMatchService {
     }
 
     private JobMatchDto fallback(String title, String company, String location, String url, int score) {
-        return new JobMatchDto(title, company, location, "Open the active search results and apply manually on the original job platform.", url, score, true);
+        return new JobMatchDto(title, company, location, "Search current openings for this resume-matched role and apply on the original job platform.", url, score, true);
     }
 
     private Set<String> words(String value) {

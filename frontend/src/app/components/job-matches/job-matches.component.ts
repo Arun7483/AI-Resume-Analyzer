@@ -61,7 +61,7 @@ import { JobsService } from '../../services/jobs.service';
             Show more opportunities <span class="text-xs text-slate-400">({{ jobs.jobs().length - visibleJobs().length }} remaining)</span>
           </button>
         }
-        <p class="mt-5 flex items-center gap-2 text-xs text-slate-400"><lucide-icon [img]="Sparkles" [size]="14" />Listings are provided by a public jobs feed. Applications open on the original job site.</p>
+        <p class="mt-5 flex items-center gap-2 text-xs text-slate-400"><lucide-icon [img]="Sparkles" [size]="14" />Real listings are ranked from public feeds. Search-link results open the original job platform.</p>
       }
     </section>
   `
