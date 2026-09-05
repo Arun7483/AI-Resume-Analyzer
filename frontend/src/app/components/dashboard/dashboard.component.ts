@@ -1,6 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Bell, FileSearch, HelpCircle, LogOut, UserRound, LucideAngularModule } from 'lucide-angular';
+import { Bell, BriefcaseBusiness, FileSearch, HelpCircle, LogOut, UserRound, LucideAngularModule } from 'lucide-angular';
 import { AnalysisDashboardComponent } from '../analysis-dashboard/analysis-dashboard.component';
 import { AiBotComponent } from '../ai-bot/ai-bot.component';
 import { ResumeUploadComponent } from '../resume-upload/resume-upload.component';
@@ -18,7 +18,7 @@ import { JobMatchesComponent } from '../job-matches/job-matches.component';
       <header class="sticky top-0 z-30 border-b bg-white/90 backdrop-blur-xl">
         <div class="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6">
           <a class="flex items-center gap-2.5 font-bold">
-            <span class="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-mint text-white">
+            <span class="grid size-9 place-items-center rounded-xl bg-brand-600 text-white">
               <lucide-icon [img]="FileSearch" [size]="20" />
             </span>
             Resume<span class="-ml-2.5 text-brand-600">Pulse</span>
@@ -28,9 +28,13 @@ import { JobMatchesComponent } from '../job-matches/job-matches.component';
             <button type="button" class="px-3 py-2 text-sm text-slate-500" (click)="showProfile()">Profile</button>
             <button type="button" class="rounded-lg px-3 py-2 text-sm font-bold" [class.bg-brand-50]="activeView() === 'jobs'" [class.text-brand-700]="activeView() === 'jobs'" (click)="showJobs()">Job matches</button>
           </nav>
+          <div class="ml-3 flex gap-1 md:hidden">
+            <button type="button" class="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold" [class.bg-brand-50]="activeView() === 'dashboard'" [class.text-brand-700]="activeView() === 'dashboard'" (click)="activeView.set('dashboard')">Dashboard</button>
+            <button type="button" class="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold" [class.bg-brand-50]="activeView() === 'jobs'" [class.text-brand-700]="activeView() === 'jobs'" (click)="showJobs()"><lucide-icon [img]="BriefcaseBusiness" [size]="14" /> Jobs</button>
+          </div>
           <div class="ml-auto flex items-center gap-2">
-            <lucide-icon [img]="HelpCircle" class="text-slate-400" />
-            <lucide-icon [img]="Bell" class="text-slate-400" />
+            <lucide-icon [img]="HelpCircle" class="hidden text-slate-400 sm:block" />
+            <lucide-icon [img]="Bell" class="hidden text-slate-400 sm:block" />
             <span class="ml-2 grid size-8 place-items-center rounded-full bg-brand-500 text-xs font-bold text-white">
               {{ (auth.fullName() || 'U').charAt(0).toUpperCase() }}
             </span>
@@ -88,6 +92,7 @@ export class DashboardComponent implements OnInit {
   readonly auth = inject(AuthService);
   readonly resumeService = inject(ResumeService);
   readonly FileSearch = FileSearch;
+  readonly BriefcaseBusiness = BriefcaseBusiness;
   readonly HelpCircle = HelpCircle;
   readonly Bell = Bell;
   readonly LogOut = LogOut;

@@ -47,41 +47,54 @@ public class JobMatchService {
         String resumeText = resume == null ? "" : resume.getRawText();
         Set<String> resumeWords = words(resumeText);
 
-        JsonNode root;
-        try {
-            root = RestClient.builder().build().get().uri(jobsFeedUrl).retrieve().body(JsonNode.class);
-        } catch (RestClientException exception) {
-            return fallbackJobs(resumeText);
-        }
-        if (root == null || !root.path("data").isArray()) {
-            return fallbackJobs(resumeText);
-        }
-
         List<JobMatchDto> matches = new ArrayList<>();
-        for (JsonNode job : root.path("data")) {
+        Set<String> seenUrls = new HashSet<>();
+        for (int page = 1; page <= 25 && matches.size() < 1200; page++) {
+            JsonNode root;
             try {
-                String title = text(job, "title");
-                String company = text(job, "company_name");
-                String location = text(job, "location");
-                String description = text(job, "description");
-                String applyUrl = text(job, "url");
-                if (title.isBlank() || applyUrl.isBlank()) {
-                    continue;
+                String separator = jobsFeedUrl.contains("?") ? "&" : "?";
+                root = RestClient.builder().build().get()
+                        .uri(page == 1 ? jobsFeedUrl : jobsFeedUrl + separator + "page=" + page)
+                        .retrieve().body(JsonNode.class);
+            } catch (RestClientException exception) {
+                if (page == 1) {
+                    return fallbackJobs(resumeText);
                 }
-                Set<String> jobWords = words(title + " " + description);
-                long overlap = jobWords.stream().filter(resumeWords::contains).count();
-                if (!resumeWords.isEmpty() && overlap == 0) {
-                    continue;
+                break;
+            }
+            if (root == null || !root.path("data").isArray() || root.path("data").isEmpty()) {
+                break;
+            }
+
+            int beforePage = matches.size();
+            for (JsonNode job : root.path("data")) {
+                try {
+                    String title = text(job, "title");
+                    String company = text(job, "company_name");
+                    String location = text(job, "location");
+                    String description = text(job, "description");
+                    String applyUrl = text(job, "url");
+                    if (title.isBlank() || applyUrl.isBlank() || !seenUrls.add(applyUrl)) {
+                        continue;
+                    }
+                    Set<String> jobWords = words(title + " " + description);
+                    long overlap = jobWords.stream().filter(resumeWords::contains).count();
+                    if (!resumeWords.isEmpty() && overlap == 0) {
+                        continue;
+                    }
+                    int score = Math.min(98, Math.max(25, 25 + (int) Math.round(73.0 * overlap / Math.max(1, Math.min(12, jobWords.size())))));
+                    matches.add(new JobMatchDto(title, company, location, clean(description), applyUrl, score, job.path("remote").asBoolean(false)));
+                } catch (RuntimeException ignored) {
+                    // Skip malformed third-party listings and keep the other jobs usable.
                 }
-                int score = Math.min(98, Math.max(25, 25 + (int) Math.round(73.0 * overlap / Math.max(1, Math.min(12, jobWords.size())))));
-                matches.add(new JobMatchDto(title, company, location, clean(description), applyUrl, score, job.path("remote").asBoolean(false)));
-            } catch (RuntimeException ignored) {
-                // Skip malformed third-party listings and keep the other jobs usable.
+            }
+            if (page > 1 && beforePage == matches.size()) {
+                break;
             }
         }
         List<JobMatchDto> ranked = matches.stream()
                 .sorted(Comparator.comparingInt(JobMatchDto::matchPercentage).reversed())
-                .limit(20)
+                .limit(1200)
                 .toList();
         return ranked.isEmpty() ? fallbackJobs(resumeText) : ranked;
     }

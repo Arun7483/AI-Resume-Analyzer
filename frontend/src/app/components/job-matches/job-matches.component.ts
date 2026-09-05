@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BriefcaseBusiness, ExternalLink, LoaderCircle, MapPin, RefreshCw, Sparkles, LucideAngularModule } from 'lucide-angular';
 import { JobsService } from '../../services/jobs.service';
@@ -15,7 +15,7 @@ import { JobsService } from '../../services/jobs.service';
           <h2 id="jobs-title" class="mt-1 text-3xl font-bold text-slate-950">Jobs matched to your resume</h2>
           <p class="mt-2 max-w-2xl text-sm text-slate-500">Fresh listings ranked by the skills and experience in your latest uploaded resume.</p>
         </div>
-        <button type="button" class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm" (click)="jobs.loadMatches()" [disabled]="jobs.loading()">
+        <button type="button" class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm" (click)="refresh()" [disabled]="jobs.loading()">
           <lucide-icon [img]="RefreshCw" [size]="15" [class.animate-spin]="jobs.loading()" /> Refresh
         </button>
       </div>
@@ -35,7 +35,7 @@ import { JobsService } from '../../services/jobs.service';
         </div>
       } @else {
         <div class="mt-8 grid gap-4 lg:grid-cols-2">
-          @for (job of jobs.jobs(); track job.applyUrl) {
+          @for (job of visibleJobs(); track job.applyUrl) {
             <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <div class="flex items-start justify-between gap-4">
                 <div>
@@ -55,6 +55,11 @@ import { JobsService } from '../../services/jobs.service';
             </article>
           }
         </div>
+        @if (visibleJobs().length < jobs.jobs().length) {
+          <button type="button" class="mx-auto mt-6 flex items-center gap-2 rounded-xl border border-brand-200 bg-white px-4 py-2.5 text-sm font-bold text-brand-700 shadow-sm hover:bg-brand-50" (click)="showMore()">
+            Show more opportunities <span class="text-xs text-slate-400">({{ jobs.jobs().length - visibleJobs().length }} remaining)</span>
+          </button>
+        }
         <p class="mt-5 flex items-center gap-2 text-xs text-slate-400"><lucide-icon [img]="Sparkles" [size]="14" />Listings are provided by a public jobs feed. Applications open on the original job site.</p>
       }
     </section>
@@ -68,8 +73,19 @@ export class JobMatchesComponent {
   readonly MapPin = MapPin;
   readonly RefreshCw = RefreshCw;
   readonly Sparkles = Sparkles;
+  readonly visibleCount = signal(24);
+  readonly visibleJobs = computed(() => this.jobs.jobs().slice(0, this.visibleCount()));
 
   ngOnInit(): void {
     this.jobs.loadMatches();
+  }
+
+  refresh(): void {
+    this.visibleCount.set(24);
+    this.jobs.loadMatches();
+  }
+
+  showMore(): void {
+    this.visibleCount.update(value => value + 24);
   }
 }
