@@ -44,7 +44,7 @@ public class JobMatchService {
     public List<JobMatchDto> findMatches() {
         Resume resume = resumes.findTopByUserIdOrderByUploadedAtDesc(currentUser.require().getId())
                 .orElse(null);
-        String resumeText = resume == null ? "" : resume.getRawText();
+        String resumeText = resume == null || resume.getRawText() == null ? "" : resume.getRawText();
         Set<String> resumeWords = words(resumeText);
 
         List<JobMatchDto> matches = new ArrayList<>();
@@ -66,7 +66,6 @@ public class JobMatchService {
                 break;
             }
 
-            int beforePage = matches.size();
             for (JsonNode job : root.path("data")) {
                 try {
                     String title = text(job, "title");
@@ -79,17 +78,11 @@ public class JobMatchService {
                     }
                     Set<String> jobWords = words(title + " " + description);
                     long overlap = jobWords.stream().filter(resumeWords::contains).count();
-                    if (!resumeWords.isEmpty() && overlap == 0) {
-                        continue;
-                    }
                     int score = Math.min(98, Math.max(25, 25 + (int) Math.round(73.0 * overlap / Math.max(1, Math.min(12, jobWords.size())))));
                     matches.add(new JobMatchDto(title, company, location, clean(description), applyUrl, score, job.path("remote").asBoolean(false)));
                 } catch (RuntimeException ignored) {
                     // Skip malformed third-party listings and keep the other jobs usable.
                 }
-            }
-            if (page > 1 && beforePage == matches.size()) {
-                break;
             }
         }
         List<JobMatchDto> ranked = matches.stream()

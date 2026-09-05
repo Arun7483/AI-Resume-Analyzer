@@ -14,6 +14,7 @@ import { JobsService } from '../../services/jobs.service';
           <p class="text-xs font-bold uppercase tracking-[.18em] text-brand-600">Live opportunities</p>
           <h2 id="jobs-title" class="mt-1 text-3xl font-bold text-slate-950">Jobs matched to your resume</h2>
           <p class="mt-2 max-w-2xl text-sm text-slate-500">Fresh listings ranked by the skills and experience in your latest uploaded resume.</p>
+          @if (jobs.jobs().length) { <p class="mt-3 text-xs font-bold text-slate-400">{{ jobs.jobs().length }} opportunities found · showing {{ visibleJobs().length }}</p> }
         </div>
         <button type="button" class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm" (click)="refresh()" [disabled]="jobs.loading()">
           <lucide-icon [img]="RefreshCw" [size]="15" [class.animate-spin]="jobs.loading()" /> Refresh

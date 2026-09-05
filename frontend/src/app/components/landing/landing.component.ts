@@ -9,12 +9,12 @@ import { LucideAngularModule } from 'lucide-angular';
   standalone: true,
   imports: [CommonModule, LucideAngularModule],
   template: `
-    <div class="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
+    <div class="min-h-screen bg-slate-50">
       <!-- Navigation -->
       <nav class="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-xl">
         <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <div class="flex items-center gap-2.5 font-bold">
-            <span class="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-mint text-white">
+            <span class="grid size-9 place-items-center rounded-xl bg-brand-600 text-white">
               <lucide-icon [img]="FileCheck2" [size]="20" />
             </span>
             <span>Resume<span class="text-brand-600">Pulse</span></span>
@@ -37,7 +37,7 @@ import { LucideAngularModule } from 'lucide-angular';
             </button>
             <button 
               (click)="navigateTo('/auth?mode=register')"
-              class="rounded-lg bg-gradient-to-r from-brand-500 to-mint px-4 py-2 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-shadow">
+              class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-brand-700 hover:shadow-xl transition-shadow">
               Get started
             </button>
           </div>
@@ -46,16 +46,11 @@ import { LucideAngularModule } from 'lucide-angular';
 
       <!-- Hero Section -->
       <section class="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-32">
-        <div class="absolute inset-0 -z-10 overflow-hidden">
-          <div class="absolute -right-20 -top-20 size-80 rounded-full bg-brand-100/50 blur-3xl"></div>
-          <div class="absolute -left-20 bottom-0 size-80 rounded-full bg-mint/20 blur-3xl"></div>
-        </div>
-        
         <div class="mx-auto max-w-2xl text-center">
           <p class="inline-block rounded-full bg-brand-50 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-brand-600">
             AI-Powered Resume Analysis
           </p>
-          <h1 class="mt-6 text-5xl font-black tracking-tight sm:text-6xl bg-gradient-to-r from-brand-600 to-mint bg-clip-text text-transparent">
+          <h1 class="mt-6 text-5xl font-black tracking-tight text-slate-950 sm:text-6xl">
             Get Your Resume Past Every Screening System
           </h1>
           <p class="mt-6 text-lg leading-8 text-slate-600">
@@ -64,7 +59,7 @@ import { LucideAngularModule } from 'lucide-angular';
           <div class="mt-10 flex items-center justify-center gap-4">
             <button 
               (click)="navigateTo('/auth?mode=register')"
-              class="rounded-lg bg-gradient-to-r from-brand-500 to-mint px-6 py-3 text-base font-semibold text-white shadow-xl hover:shadow-2xl transition-all hover:scale-105">
+              class="rounded-lg bg-brand-600 px-6 py-3 text-base font-semibold text-white shadow-xl transition-all hover:bg-brand-700 hover:shadow-2xl hover:scale-105">
               Start Free Analysis
             </button>
             <button 
@@ -189,10 +184,7 @@ import { LucideAngularModule } from 'lucide-angular';
 
       <!-- CTA Section -->
       <section class="mx-auto max-w-7xl px-4 py-20 sm:px-6">
-        <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-brand-600 to-mint px-8 py-16 shadow-2xl sm:px-12 sm:py-20">
-          <div class="absolute inset-0 -z-10 opacity-10">
-            <div class="absolute -right-20 -top-20 size-80 rounded-full bg-white blur-3xl"></div>
-          </div>
+        <div class="relative overflow-hidden rounded-3xl bg-brand-700 px-8 py-16 shadow-2xl sm:px-12 sm:py-20">
           <div class="mx-auto max-w-2xl text-center">
             <h2 class="text-3xl font-bold tracking-tight text-white sm:text-4xl">
               Ready to Stand Out?
@@ -202,7 +194,7 @@ import { LucideAngularModule } from 'lucide-angular';
             </p>
             <button 
               (click)="navigateTo('/auth?mode=register')"
-              class="mt-8 inline-flex items-center rounded-lg bg-white px-6 py-3 text-base font-semibold text-brand-600 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
+              class="mt-8 inline-flex items-center rounded-lg bg-white px-6 py-3 text-base font-semibold text-brand-700 shadow-xl transition-all hover:bg-brand-50 hover:shadow-2xl hover:scale-105">
               Get Started Free
               <lucide-icon [img]="ArrowRight" class="ml-2" [size]="18" />
             </button>
@@ -215,7 +207,7 @@ import { LucideAngularModule } from 'lucide-angular';
         <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6">
           <div class="flex flex-col items-center justify-between gap-4 sm:flex-row">
             <div class="flex items-center gap-2 font-bold">
-              <span class="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-brand-500 to-mint text-white">
+              <span class="grid size-8 place-items-center rounded-lg bg-brand-600 text-white">
                 <lucide-icon [img]="FileCheck2" [size]="18" />
               </span>
               Resume<span class="text-brand-600">Pulse</span>
