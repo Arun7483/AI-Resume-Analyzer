@@ -51,14 +51,10 @@ public class AuthService {
                 .password(encoder.encode(request.password()))
                 .fullName(request.fullName().trim())
                 .role(User.Role.ROLE_USER)
-                .emailVerified(false)
-                .verificationToken(UUID.randomUUID().toString())
-                .verificationExpiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
+                .emailVerified(true)
                 .build());
 
-        verification.send(user);
-        return new AuthResponse(null, null, 0, user.getFullName(), user.getRole().name(), false,
-                "Please verify your email before signing in.");
+            return response(user);
     }
 
     @Transactional

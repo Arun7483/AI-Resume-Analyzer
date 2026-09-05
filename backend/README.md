@@ -36,7 +36,7 @@ DB_PASSWORD=YOUR_AIVEN_PASSWORD
 
 Enter the actual values in Render. Do not enter `${DATABASE_USERNAME}`, `${DATABASE_PASSWORD}`, or the literal `CLICK_TO:REVEAL_PASSWORD`.
 
-Render runs the `prod,mail` profiles so signup verification emails are sent. If `RESEND_API_KEY` is configured, verification uses Resend's HTTPS API and does not depend on Render allowing SMTP connections. Set `MAIL_FROM` to a sender verified in Resend. SMTP remains available as a fallback when `RESEND_API_KEY` is empty.
+Normal email/password signup is enabled and signs users in immediately; it does not require email verification. Google sign-in also creates verified accounts. The verification endpoints remain available for existing accounts and backwards compatibility.
 
 ## Email verification (local Gmail setup)
 

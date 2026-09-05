@@ -463,8 +463,7 @@ export class AuthComponent {
         }
 
         /*
-         * Registration requiring
-         * email verification.
+         * Normal email/password registration logs the user in immediately.
          */
         if (
           this.registerMode()
@@ -483,7 +482,7 @@ export class AuthComponent {
 
             this.message.set(
               response.message ||
-              'Account created. Please check your email and verify your account.'
+              'Account created successfully.'
             );
 
           }
