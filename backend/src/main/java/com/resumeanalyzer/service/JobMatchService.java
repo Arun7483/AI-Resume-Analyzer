@@ -116,7 +116,8 @@ public class JobMatchService {
                         "LinkedIn", "https://www.linkedin.com/jobs/search/?keywords=" + query,
                         "Naukri", "https://www.naukri.com/" + title.toLowerCase(Locale.ROOT).replace(' ', '-') + "-jobs",
                         "Foundit", "https://www.foundit.in/srp/results?query=" + query,
-                        "Internshala", "https://internshala.com/jobs/keywords-" + title.toLowerCase(Locale.ROOT).replace(' ', '-') + "/"
+                    "Internshala", "https://internshala.com/jobs/keywords-" + title.toLowerCase(Locale.ROOT).replace(' ', '-') + "/",
+                    "Unstop", "https://unstop.com/jobs?search=" + query
                 );
                 for (Map.Entry<String, String> portal : portals.entrySet()) {
                     jobs.add(fallback(title, portal.getKey() + " active job search", "Current listings", portal.getValue(), 72 - Math.min(20, roleIndex * 4)));
@@ -128,10 +129,10 @@ public class JobMatchService {
     }
 
     private List<String> detectRoles(String resumeText) {
-        if (containsAny(resumeText, "electronics", "embedded", "microcontroller", "pcb", "fpga", "verilog", "vlsi", "circuit", "firmware", "arduino", "instrumentation")) {
+        if (containsAny(resumeText, "electronics engineer", "embedded systems", "microcontroller", "pcb design", "fpga", "verilog", "vlsi", "circuit design", "firmware engineer", "arduino", "instrumentation")) {
             return List.of("Electronics Engineer", "Embedded Systems Engineer", "Hardware Design Engineer", "PCB Design Engineer", "Firmware Engineer", "Test and Validation Engineer");
         }
-        if (containsAny(resumeText, "data analyst", "sql", "tableau", "power bi", "statistics", "analytics")) {
+        if (containsAny(resumeText, "data analyst", "sql developer", "tableau", "power bi", "statistics", "analytics")) {
             return List.of("Data Analyst", "Business Analyst", "Data Engineer", "BI Analyst", "Reporting Analyst");
         }
         if (containsAny(resumeText, "figma", "user experience", "ux", "ui design", "prototype")) {

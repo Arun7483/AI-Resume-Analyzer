@@ -4,3 +4,4 @@ export interface KeywordMatch { keyword: string; matched: boolean; importance: '
 export interface ResumeAnalysisResponse { id: string; fileName: string; candidateName: string; overallScore: number; atsMatchPercentage: number; summary: string; strengths: ResumeInsight[]; improvements: ResumeInsight[]; keywords: KeywordMatch[]; analyzedAt: string; }
 export interface UploadResponse { resumeId: number; fileName: string; overallScore: number; atsMatchPercentage: number; strengths: string[]; weaknesses: string[]; missingKeywords: string[]; analyzedAt: string; }
 export interface UploadProgress { progress: number; stage: AnalysisStatus; }
+export interface ResumeHistory { id: number; fileName: string; uploadedAt: string; }

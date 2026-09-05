@@ -62,7 +62,17 @@ import { JobMatchesComponent } from '../job-matches/job-matches.component';
                 <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-bold uppercase text-slate-400">Account type</dt><dd class="mt-1 font-semibold text-slate-800">{{ auth.role().replace('ROLE_', '') }}</dd></div>
                 <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-bold uppercase text-slate-400">Status</dt><dd class="mt-1 font-semibold text-emerald-600">Active</dd></div>
               </dl>
-              <button type="button" class="mt-6 flex items-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700" (click)="logout()"><lucide-icon [img]="LogOut" [size]="16" /> Log out</button>
+              <div class="mt-8 border-t border-slate-100 pt-6">
+                <div class="flex items-center justify-between gap-3"><h3 class="font-bold text-slate-900">Uploaded resumes</h3><span class="text-xs font-semibold text-slate-400">{{ resumeService.history().length }} files</span></div>
+                @if (resumeService.history().length) {
+                  <div class="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
+                    @for (resume of resumeService.history(); track resume.id) {
+                      <div class="flex items-center justify-between gap-3 px-4 py-3"><div class="min-w-0"><p class="truncate text-sm font-semibold text-slate-800">{{ resume.fileName }}</p><p class="mt-1 text-xs text-slate-500">Uploaded {{ resume.uploadedAt | date:'medium' }}</p></div><span class="shrink-0 rounded-full bg-brand-50 px-2 py-1 text-xs font-bold text-brand-700">Resume {{ resume.id }}</span></div>
+                    }
+                  </div>
+                } @else { <p class="mt-3 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No resumes uploaded yet.</p> }
+              </div>
+              <button type="button" class="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700" (click)="logout()"><lucide-icon [img]="LogOut" [size]="16" /> Log out</button>
             </div>
           </section>
         } @else {
@@ -101,6 +111,7 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit(): void {
     this.updateCurrentDate();
+    this.resumeService.loadHistory();
     setInterval(() => this.updateCurrentDate(), 60000); // Update every minute
   }
 
