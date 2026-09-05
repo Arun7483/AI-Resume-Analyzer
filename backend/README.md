@@ -89,6 +89,7 @@ Create the app password in the Google Account security settings after enabling 2
 - `POST /api/v1/auth/register` — email, password, and fullName
 - `POST /api/v1/auth/login` — email and password
 - `POST /api/v1/resumes/upload` — multipart `file` and optional `jobDescription`
+- `GET /api/v1/resumes/job-matches` — active job listings ranked against the latest uploaded resume
 - `POST /api/v1/chat` — prompt and optional resumeId
 
-All resume and chat endpoints require `Authorization: Bearer <token>`. Ownership is derived from the authenticated principal rather than request-provided user IDs.
+All resume, job-match, and chat endpoints require `Authorization: Bearer <token>`. Ownership is derived from the authenticated principal rather than request-provided user IDs. Job applications open on the original listing site through each returned `applyUrl`.

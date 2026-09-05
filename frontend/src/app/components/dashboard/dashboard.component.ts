@@ -7,11 +7,12 @@ import { ResumeUploadComponent } from '../resume-upload/resume-upload.component'
 import { AuthService } from '../../services/auth.service';
 import { ResumeAnalysisResponse } from '../../models/resume.model';
 import { ResumeService } from '../../services/resume.service';
+import { JobMatchesComponent } from '../job-matches/job-matches.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, ResumeUploadComponent, AnalysisDashboardComponent, AiBotComponent],
+  imports: [CommonModule, LucideAngularModule, ResumeUploadComponent, AnalysisDashboardComponent, AiBotComponent, JobMatchesComponent],
   template: `
     <div class="min-h-screen bg-slate-50">
       <header class="sticky top-0 z-30 border-b bg-white/90 backdrop-blur-xl">
@@ -23,9 +24,9 @@ import { ResumeService } from '../../services/resume.service';
             Resume<span class="-ml-2.5 text-brand-600">Pulse</span>
           </a>
           <nav class="ml-10 hidden gap-1 md:flex">
-            <a class="rounded-lg bg-brand-50 px-3 py-2 text-sm font-bold text-brand-700">Dashboard</a>
-            <a class="px-3 py-2 text-sm text-slate-500">My resumes</a>
-            <a class="px-3 py-2 text-sm text-slate-500">Job matches</a>
+            <button type="button" class="rounded-lg px-3 py-2 text-sm font-bold" [class.bg-brand-50]="activeView() === 'dashboard'" [class.text-brand-700]="activeView() === 'dashboard'" (click)="activeView.set('dashboard')">Dashboard</button>
+            <button type="button" class="px-3 py-2 text-sm text-slate-500">My resumes</button>
+            <button type="button" class="rounded-lg px-3 py-2 text-sm font-bold" [class.bg-brand-50]="activeView() === 'jobs'" [class.text-brand-700]="activeView() === 'jobs'" (click)="showJobs()">Job matches</button>
           </nav>
           <div class="ml-auto flex items-center gap-2">
             <lucide-icon [img]="HelpCircle" class="text-slate-400" />
@@ -45,6 +46,9 @@ import { ResumeService } from '../../services/resume.service';
         </div>
       </header>
       <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        @if (activeView() === 'jobs') {
+          <app-job-matches />
+        } @else {
         <p class="text-sm font-semibold text-brand-600">{{ currentDate }}</p>
         <h1 class="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">Make your next application count.</h1>
         <p class="mt-2 max-w-2xl text-sm text-slate-500">AI-powered feedback that helps your experience get noticed and pass every screening system.</p>
@@ -58,6 +62,7 @@ import { ResumeService } from '../../services/resume.service';
           </aside>
           <app-analysis-dashboard [analysis]="analysis()" />
         </div>
+        }
       </main>
       <app-ai-bot [resumeId]="currentResumeId()" />
     </div>
@@ -74,6 +79,7 @@ export class DashboardComponent implements OnInit {
   readonly progress = signal(0);
   readonly analysis = signal<ResumeAnalysisResponse | null>(null);
   readonly currentResumeId = signal<number | null>(null);
+  readonly activeView = signal<'dashboard' | 'jobs'>('dashboard');
   currentDate = '';
 
   ngOnInit(): void {
@@ -107,6 +113,10 @@ export class DashboardComponent implements OnInit {
         alert(error.error?.message ?? 'Failed to analyze resume. Please try again.');
       }
     });
+  }
+
+  showJobs(): void {
+    this.activeView.set('jobs');
   }
 
   logout(): void {
