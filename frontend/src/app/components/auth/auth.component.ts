@@ -8,7 +8,7 @@ import {
   FormsModule
 } from '@angular/forms';
 
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { Observable } from 'rxjs';
 
@@ -360,6 +360,8 @@ export class AuthComponent {
 
   private readonly route = inject(ActivatedRoute);
 
+  private readonly router = inject(Router);
+
 
   readonly registerMode =
     signal(false);
@@ -478,6 +480,10 @@ export class AuthComponent {
               'Account created successfully.'
             );
 
+            if (response.accessToken) {
+              void this.router.navigateByUrl('/dashboard');
+            }
+
           } else {
 
             this.message.set(
@@ -498,6 +504,10 @@ export class AuthComponent {
           response.message ||
           'Login successful.'
         );
+
+        if (response.accessToken) {
+          void this.router.navigateByUrl('/dashboard');
+        }
 
       },
 
