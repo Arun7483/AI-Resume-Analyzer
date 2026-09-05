@@ -14,6 +14,7 @@ import org.springframework.web.client.RestClientException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -175,19 +176,48 @@ public class JobMatchService {
     }
 
     private List<String> detectRoles(String resumeText) {
-        if (containsAny(resumeText, "electronics engineer", "embedded systems", "microcontroller", "pcb design", "fpga", "verilog", "vlsi", "circuit design", "firmware engineer", "arduino", "instrumentation")) {
-            return List.of("Electronics Engineer", "Embedded Systems Engineer", "Hardware Design Engineer", "PCB Design Engineer", "Firmware Engineer", "Test and Validation Engineer");
+        LinkedHashSet<String> roles = new LinkedHashSet<>();
+        boolean hardwareProfile = containsAny(resumeText, "electronics", "electronic", "embedded", "microcontroller", "micro controller", "pcb", "fpga", "verilog", "vhdl", "vlsi", "circuit", "firmware", "arduino", "raspberry pi", "instrumentation", "altium", "proteus", "ltspice", "cadence", "hardware", "iot");
+        if (hardwareProfile) {
+            roles.addAll(List.of("Electronics Engineer", "Embedded Systems Engineer", "Hardware Design Engineer", "PCB Design Engineer", "Firmware Engineer", "FPGA Engineer"));
         }
-        if (containsAny(resumeText, "data analyst", "sql developer", "tableau", "power bi", "statistics", "analytics")) {
-            return List.of("Data Analyst", "Business Analyst", "Data Engineer", "BI Analyst", "Reporting Analyst");
+        if (!hardwareProfile && containsAny(resumeText, "java", "spring boot", "python", "javascript", "typescript", "react", "angular", "node.js", "software engineer", "software developer", "rest api", "docker", "kubernetes")) {
+            roles.addAll(List.of("Software Engineer", "Backend Developer", "Frontend Developer", "Full Stack Developer", "DevOps Engineer"));
         }
-        if (containsAny(resumeText, "figma", "user experience", "ux", "ui design", "prototype")) {
-            return List.of("UX Designer", "UI Designer", "Product Designer", "UX Researcher");
+        if (containsAny(resumeText, "data analyst", "sql", "tableau", "power bi", "statistics", "analytics", "machine learning", "data science", "pandas", "tensorflow")) {
+            roles.addAll(List.of("Data Analyst", "Data Scientist", "Data Engineer", "Business Intelligence Analyst", "Machine Learning Engineer"));
         }
-        if (containsAny(resumeText, "product manager", "roadmap", "agile", "scrum", "stakeholder")) {
-            return List.of("Product Manager", "Product Analyst", "Program Manager", "Business Analyst");
+        if (containsAny(resumeText, "cybersecurity", "information security", "soc analyst", "penetration testing", "ethical hacker", "siem", "vulnerability", "incident response")) {
+            roles.addAll(List.of("Cybersecurity Analyst", "SOC Analyst", "Security Engineer", "Penetration Tester", "Cloud Security Engineer"));
         }
-        return List.of("Software Engineer", "Frontend Developer", "Backend Developer", "QA Engineer", "DevOps Engineer");
+        if (containsAny(resumeText, "mechanical engineer", "solidworks", "autocad", "ansys", "manufacturing", "production engineer", "cnc", "cad", "cam", "thermodynamics", "hvac")) {
+            roles.addAll(List.of("Mechanical Engineer", "Mechanical Design Engineer", "Manufacturing Engineer", "Production Engineer", "CAD Engineer"));
+        }
+        if (containsAny(resumeText, "civil engineer", "structural", "construction", "autocad civil", "quantity survey", "geotechnical", "site engineer", "revit")) {
+            roles.addAll(List.of("Civil Engineer", "Structural Engineer", "Construction Engineer", "Site Engineer", "Project Engineer"));
+        }
+        if (containsAny(resumeText, "automotive", "vehicle", "ev engineer", "battery management", "adas", "autonomous driving", "powertrain")) {
+            roles.addAll(List.of("Automotive Engineer", "Automotive Embedded Engineer", "EV Engineer", "Battery Engineer", "ADAS Engineer"));
+        }
+        if (containsAny(resumeText, "figma", "user experience", "ux", "ui design", "prototype", "wireframe", "graphic design")) {
+            roles.addAll(List.of("UX Designer", "UI Designer", "Product Designer", "UX Researcher", "Visual Designer"));
+        }
+        if (containsAny(resumeText, "product manager", "roadmap", "agile", "scrum", "stakeholder", "product owner")) {
+            roles.addAll(List.of("Product Manager", "Product Owner", "Program Manager", "Business Analyst", "Project Manager"));
+        }
+        if (containsAny(resumeText, "marketing", "seo", "sem", "social media", "content marketing", "brand manager")) {
+            roles.addAll(List.of("Digital Marketing Specialist", "SEO Specialist", "Marketing Analyst", "Content Strategist", "Brand Manager"));
+        }
+        if (containsAny(resumeText, "accounting", "finance", "financial analyst", "banking", "audit", "tax", "risk management")) {
+            roles.addAll(List.of("Financial Analyst", "Accountant", "Risk Analyst", "Audit Analyst", "Banking Operations Analyst"));
+        }
+        if (containsAny(resumeText, "nurse", "clinical", "pharmac", "medical", "healthcare", "hospital", "biomedical")) {
+            roles.addAll(List.of("Clinical Research Associate", "Healthcare Administrator", "Medical Laboratory Technician", "Biomedical Engineer", "Pharmacist"));
+        }
+        if (roles.isEmpty()) {
+            roles.addAll(List.of("Software Engineer", "Business Analyst", "Operations Analyst", "Project Coordinator"));
+        }
+        return List.copyOf(roles);
     }
 
     private List<String> detectSeniority(String resumeText) {
