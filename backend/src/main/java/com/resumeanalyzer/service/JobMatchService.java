@@ -63,41 +63,43 @@ public class JobMatchService {
         private void collectArbeitnow(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords) {
         Set<String> seenPages = new HashSet<>();
         for (int page = 1; page <= 100 && matches.size() < 1200; page++) {
-            JsonNode root;
             try {
                 String separator = jobsFeedUrl.contains("?") ? "&" : "?";
-                root = RestClient.builder().build().get()
+                    JsonNode root = RestClient.builder().build().get()
                         .uri(page == 1 ? jobsFeedUrl : jobsFeedUrl + separator + "page=" + page)
                         .retrieve().body(JsonNode.class);
-            } catch (RestClientException exception) {
+                    if (root == null || !root.path("data").isArray() || root.path("data").isEmpty()) {
+                        break;
+                    }
+                    String pageSignature = root.path("data").get(0).path("url").asText("") + ":" + root.path("data").size();
+                    if (!seenPages.add(pageSignature)) {
+                        break;
+                    }
+                    for (JsonNode job : root.path("data")) {
+                        addArbeitnowJob(matches, seenUrls, resumeWords, job);
+                    }
+                } catch (RuntimeException exception) {
                 if (page == 1) {
                     return;
                 }
                 break;
             }
-            if (root == null || !root.path("data").isArray() || root.path("data").isEmpty()) {
-                break;
             }
-            String pageSignature = root.path("data").get(0).path("url").asText("") + ":" + root.path("data").size();
-            if (!seenPages.add(pageSignature)) {
-                break;
-            }
+        }
 
-            for (JsonNode job : root.path("data")) {
-                try {
-                    String title = text(job, "title");
-                    String company = text(job, "company_name");
-                    String location = text(job, "location");
-                    String description = text(job, "description");
-                    String applyUrl = text(job, "url");
-                    if (title.isBlank() || applyUrl.isBlank() || !seenUrls.add(applyUrl)) {
-                        continue;
-                    }
-                    matches.add(toMatch(title, company, location, description, applyUrl, job.path("remote").asBoolean(false), resumeWords));
-                } catch (RuntimeException ignored) {
-                    // Skip malformed third-party listings and keep the other jobs usable.
-                }
+        private void addArbeitnowJob(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords, JsonNode job) {
+            try {
+                String title = text(job, "title");
+                String company = text(job, "company_name");
+                String location = text(job, "location");
+                String description = text(job, "description");
+                String applyUrl = text(job, "url");
+                if (title.isBlank() || applyUrl.isBlank() || !seenUrls.add(applyUrl)) {
+                    return;
             }
+                matches.add(toMatch(title, company, location, description, applyUrl, job.path("remote").asBoolean(false), resumeWords));
+            } catch (RuntimeException ignored) {
+                // Skip malformed third-party listings and keep the other jobs usable.
         }
     }
 
