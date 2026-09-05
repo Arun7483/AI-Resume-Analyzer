@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,16 +44,17 @@ public class JobMatchService {
     public List<JobMatchDto> findMatches() {
         Resume resume = resumes.findTopByUserIdOrderByUploadedAtDesc(currentUser.require().getId())
                 .orElse(null);
-        Set<String> resumeWords = resume == null ? Set.of() : words(resume.getRawText());
+        String resumeText = resume == null ? "" : resume.getRawText();
+        Set<String> resumeWords = words(resumeText);
 
         JsonNode root;
         try {
             root = RestClient.builder().build().get().uri(jobsFeedUrl).retrieve().body(JsonNode.class);
         } catch (RestClientException exception) {
-            return fallbackJobs(resumeWords);
+            return fallbackJobs(resumeText);
         }
         if (root == null || !root.path("data").isArray()) {
-            return fallbackJobs(resumeWords);
+            return fallbackJobs(resumeText);
         }
 
         List<JobMatchDto> matches = new ArrayList<>();
@@ -68,6 +70,9 @@ public class JobMatchService {
                 }
                 Set<String> jobWords = words(title + " " + description);
                 long overlap = jobWords.stream().filter(resumeWords::contains).count();
+                if (!resumeWords.isEmpty() && overlap == 0) {
+                    continue;
+                }
                 int score = Math.min(98, Math.max(25, 25 + (int) Math.round(73.0 * overlap / Math.max(1, Math.min(12, jobWords.size())))));
                 matches.add(new JobMatchDto(title, company, location, clean(description), applyUrl, score, job.path("remote").asBoolean(false)));
             } catch (RuntimeException ignored) {
@@ -78,21 +83,79 @@ public class JobMatchService {
                 .sorted(Comparator.comparingInt(JobMatchDto::matchPercentage).reversed())
                 .limit(20)
                 .toList();
-        return ranked.isEmpty() ? fallbackJobs(resumeWords) : ranked;
+        return ranked.isEmpty() ? fallbackJobs(resumeText) : ranked;
     }
 
-    private List<JobMatchDto> fallbackJobs(Set<String> resumeWords) {
-        return List.of(
-                fallback("Software Engineer", "Search active software engineering roles", "Remote", "https://www.linkedin.com/jobs/search/?keywords=software%20engineer", resumeWords),
-                fallback("Frontend Developer", "Search active frontend developer roles", "Remote", "https://www.linkedin.com/jobs/search/?keywords=frontend%20developer", resumeWords),
-                fallback("Backend Developer", "Search active backend developer roles", "Remote", "https://www.linkedin.com/jobs/search/?keywords=backend%20developer", resumeWords),
-                fallback("Data Analyst", "Search active data analyst roles", "Remote", "https://www.linkedin.com/jobs/search/?keywords=data%20analyst", resumeWords),
-                fallback("Product Designer", "Search active product designer roles", "Remote", "https://www.linkedin.com/jobs/search/?keywords=product%20designer", resumeWords)
-        );
+    private List<JobMatchDto> fallbackJobs(String resumeText) {
+        String normalized = resumeText.toLowerCase(Locale.ROOT);
+        List<String> roles = detectRoles(normalized);
+        List<String> seniority = detectSeniority(normalized);
+        List<JobMatchDto> jobs = new ArrayList<>();
+        int roleIndex = 0;
+
+        for (String role : roles) {
+            for (String level : seniority) {
+                String title = level + " " + role;
+                String query = java.net.URLEncoder.encode(title, java.nio.charset.StandardCharsets.UTF_8);
+                Map<String, String> portals = Map.of(
+                        "LinkedIn", "https://www.linkedin.com/jobs/search/?keywords=" + query,
+                        "Naukri", "https://www.naukri.com/" + title.toLowerCase(Locale.ROOT).replace(' ', '-') + "-jobs",
+                        "Foundit", "https://www.foundit.in/srp/results?query=" + query,
+                        "Internshala", "https://internshala.com/jobs/keywords-" + title.toLowerCase(Locale.ROOT).replace(' ', '-') + "/"
+                );
+                for (Map.Entry<String, String> portal : portals.entrySet()) {
+                    jobs.add(fallback(title, portal.getKey() + " active job search", "Current listings", portal.getValue(), 72 - Math.min(20, roleIndex * 4)));
+                }
+                roleIndex++;
+            }
+        }
+        return jobs;
     }
 
-    private JobMatchDto fallback(String title, String company, String location, String url, Set<String> resumeWords) {
-        int score = resumeWords.isEmpty() ? 50 : 60;
+    private List<String> detectRoles(String resumeText) {
+        if (containsAny(resumeText, "electronics", "embedded", "microcontroller", "pcb", "fpga", "verilog", "vlsi", "circuit", "firmware", "arduino", "instrumentation")) {
+            return List.of("Electronics Engineer", "Embedded Systems Engineer", "Hardware Design Engineer", "PCB Design Engineer", "Firmware Engineer", "Test and Validation Engineer");
+        }
+        if (containsAny(resumeText, "data analyst", "sql", "tableau", "power bi", "statistics", "analytics")) {
+            return List.of("Data Analyst", "Business Analyst", "Data Engineer", "BI Analyst", "Reporting Analyst");
+        }
+        if (containsAny(resumeText, "figma", "user experience", "ux", "ui design", "prototype")) {
+            return List.of("UX Designer", "UI Designer", "Product Designer", "UX Researcher");
+        }
+        if (containsAny(resumeText, "product manager", "roadmap", "agile", "scrum", "stakeholder")) {
+            return List.of("Product Manager", "Product Analyst", "Program Manager", "Business Analyst");
+        }
+        return List.of("Software Engineer", "Frontend Developer", "Backend Developer", "QA Engineer", "DevOps Engineer");
+    }
+
+    private List<String> detectSeniority(String resumeText) {
+        java.util.regex.Matcher years = Pattern.compile("(\\d+)\\+?\\s*(?:years|yrs)").matcher(resumeText);
+        int maximumYears = 0;
+        while (years.find()) {
+            maximumYears = Math.max(maximumYears, Integer.parseInt(years.group(1)));
+        }
+        if (maximumYears == 0 && containsAny(resumeText, "fresher", "entry level", "intern", "graduate", "student")) {
+            return List.of("Intern", "Graduate", "Junior");
+        }
+        if (maximumYears >= 6) {
+            return List.of("Senior", "Lead", "Principal");
+        }
+        if (maximumYears >= 2) {
+            return List.of("Mid-level", "Senior", "Specialist");
+        }
+        return List.of("Junior", "Associate", "Trainee");
+    }
+
+    private boolean containsAny(String text, String... terms) {
+        for (String term : terms) {
+            if (text.contains(term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private JobMatchDto fallback(String title, String company, String location, String url, int score) {
         return new JobMatchDto(title, company, location, "Open the active search results and apply manually on the original job platform.", url, score, true);
     }
 
