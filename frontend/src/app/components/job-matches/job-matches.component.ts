@@ -30,8 +30,8 @@ import { JobsService } from '../../services/jobs.service';
       } @else if (!jobs.jobs().length) {
         <div class="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <lucide-icon [img]="BriefcaseBusiness" [size]="30" class="mx-auto text-brand-500" />
-          <h3 class="mt-3 font-bold text-slate-900">Upload a resume to unlock job matches</h3>
-          <p class="mt-1 text-sm text-slate-500">Your latest resume gives the matching engine the skills it needs. If you already uploaded one, refresh after the analysis finishes.</p>
+          <h3 class="mt-3 font-bold text-slate-900">No active listings are available right now</h3>
+          <p class="mt-1 text-sm text-slate-500">Refresh in a moment, or upload a resume and try again after analysis finishes.</p>
         </div>
       } @else {
         <div class="mt-8 grid gap-4 lg:grid-cols-2">

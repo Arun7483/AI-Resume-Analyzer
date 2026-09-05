@@ -43,22 +43,18 @@ public class JobMatchService {
     public List<JobMatchDto> findMatches() {
         Resume resume = resumes.findTopByUserIdOrderByUploadedAtDesc(currentUser.require().getId())
                 .orElse(null);
-
-        if (resume == null || resume.getRawText() == null || resume.getRawText().isBlank()) {
-            return List.of();
-        }
+        Set<String> resumeWords = resume == null ? Set.of() : words(resume.getRawText());
 
         JsonNode root;
         try {
             root = RestClient.builder().build().get().uri(jobsFeedUrl).retrieve().body(JsonNode.class);
         } catch (RestClientException exception) {
-            return List.of();
+            return fallbackJobs(resumeWords);
         }
         if (root == null || !root.path("data").isArray()) {
-            return List.of();
+            return fallbackJobs(resumeWords);
         }
 
-        Set<String> resumeWords = words(resume.getRawText());
         List<JobMatchDto> matches = new ArrayList<>();
         for (JsonNode job : root.path("data")) {
             try {
@@ -78,10 +74,26 @@ public class JobMatchService {
                 // Skip malformed third-party listings and keep the other jobs usable.
             }
         }
-        return matches.stream()
+        List<JobMatchDto> ranked = matches.stream()
                 .sorted(Comparator.comparingInt(JobMatchDto::matchPercentage).reversed())
                 .limit(20)
                 .toList();
+        return ranked.isEmpty() ? fallbackJobs(resumeWords) : ranked;
+    }
+
+    private List<JobMatchDto> fallbackJobs(Set<String> resumeWords) {
+        return List.of(
+                fallback("Software Engineer", "Search active software engineering roles", "Remote", "https://www.linkedin.com/jobs/search/?keywords=software%20engineer", resumeWords),
+                fallback("Frontend Developer", "Search active frontend developer roles", "Remote", "https://www.linkedin.com/jobs/search/?keywords=frontend%20developer", resumeWords),
+                fallback("Backend Developer", "Search active backend developer roles", "Remote", "https://www.linkedin.com/jobs/search/?keywords=backend%20developer", resumeWords),
+                fallback("Data Analyst", "Search active data analyst roles", "Remote", "https://www.linkedin.com/jobs/search/?keywords=data%20analyst", resumeWords),
+                fallback("Product Designer", "Search active product designer roles", "Remote", "https://www.linkedin.com/jobs/search/?keywords=product%20designer", resumeWords)
+        );
+    }
+
+    private JobMatchDto fallback(String title, String company, String location, String url, Set<String> resumeWords) {
+        int score = resumeWords.isEmpty() ? 50 : 60;
+        return new JobMatchDto(title, company, location, "Open the active search results and apply manually on the original job platform.", url, score, true);
     }
 
     private Set<String> words(String value) {
