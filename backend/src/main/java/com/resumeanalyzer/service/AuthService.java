@@ -158,8 +158,8 @@ public class AuthService {
 
     private AuthResponse response(User user) {
         String token = jwt.generate(user);
-        return new AuthResponse(token, "Bearer", jwt.expirationSeconds(), user.getFullName(),
-                user.getRole().name(), true, "Login successful");
+        return new AuthResponse(token, "Bearer", jwt.expirationSeconds(), user.getFullName(), user.getEmail(),
+            user.getRole().name(), true, "Login successful");
     }
 
     private String value(java.util.Map<?, ?> claims, String key) {

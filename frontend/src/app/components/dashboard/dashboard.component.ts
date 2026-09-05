@@ -1,6 +1,6 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Bell, ChevronDown, FileSearch, HelpCircle, LucideAngularModule } from 'lucide-angular';
+import { Bell, FileSearch, HelpCircle, LogOut, UserRound, LucideAngularModule } from 'lucide-angular';
 import { AnalysisDashboardComponent } from '../analysis-dashboard/analysis-dashboard.component';
 import { AiBotComponent } from '../ai-bot/ai-bot.component';
 import { ResumeUploadComponent } from '../resume-upload/resume-upload.component';
@@ -25,7 +25,7 @@ import { JobMatchesComponent } from '../job-matches/job-matches.component';
           </a>
           <nav class="ml-10 hidden gap-1 md:flex">
             <button type="button" class="rounded-lg px-3 py-2 text-sm font-bold" [class.bg-brand-50]="activeView() === 'dashboard'" [class.text-brand-700]="activeView() === 'dashboard'" (click)="activeView.set('dashboard')">Dashboard</button>
-            <button type="button" class="px-3 py-2 text-sm text-slate-500">My resumes</button>
+            <button type="button" class="px-3 py-2 text-sm text-slate-500" (click)="showProfile()">Profile</button>
             <button type="button" class="rounded-lg px-3 py-2 text-sm font-bold" [class.bg-brand-50]="activeView() === 'jobs'" [class.text-brand-700]="activeView() === 'jobs'" (click)="showJobs()">Job matches</button>
           </nav>
           <div class="ml-auto flex items-center gap-2">
@@ -34,13 +34,13 @@ import { JobMatchesComponent } from '../job-matches/job-matches.component';
             <span class="ml-2 grid size-8 place-items-center rounded-full bg-brand-500 text-xs font-bold text-white">
               {{ (auth.fullName() || 'U').charAt(0).toUpperCase() }}
             </span>
-            <span class="hidden text-sm font-bold sm:inline">{{ auth.fullName() || 'Account' }}</span>
-            <button 
-              type="button" 
-              class="rounded-lg p-2 text-slate-400 hover:bg-slate-100" 
-              (click)="logout()" 
-              aria-label="Log out">
-              <lucide-icon [img]="ChevronDown" [size]="15" />
+            <button type="button" class="hidden text-left sm:block" (click)="showProfile()">
+              <span class="block text-sm font-bold">{{ auth.fullName() || 'Account' }}</span>
+              <span class="block text-xs text-slate-400">Profile</span>
+            </button>
+            <button type="button" class="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-600" (click)="logout()" aria-label="Log out">
+              <lucide-icon [img]="LogOut" [size]="15" />
+              <span class="hidden sm:inline">Log out</span>
             </button>
           </div>
         </div>
@@ -48,6 +48,22 @@ import { JobMatchesComponent } from '../job-matches/job-matches.component';
       <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         @if (activeView() === 'jobs') {
           <app-job-matches />
+        } @else if (activeView() === 'profile') {
+          <section class="max-w-2xl">
+            <p class="text-xs font-bold uppercase tracking-[.18em] text-brand-600">Account</p>
+            <h1 class="mt-1 text-3xl font-bold text-slate-950">Your profile</h1>
+            <div class="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div class="flex items-center gap-4">
+                <span class="grid size-16 place-items-center rounded-full bg-brand-500 text-xl font-bold text-white">{{ (auth.fullName() || 'U').charAt(0).toUpperCase() }}</span>
+                <div><h2 class="text-xl font-bold text-slate-950">{{ auth.fullName() || 'Account' }}</h2><p class="text-sm text-slate-500">{{ auth.email() || 'Email account' }}</p></div>
+              </div>
+              <dl class="mt-8 grid gap-4 sm:grid-cols-2">
+                <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-bold uppercase text-slate-400">Account type</dt><dd class="mt-1 font-semibold text-slate-800">{{ auth.role().replace('ROLE_', '') }}</dd></div>
+                <div class="rounded-xl bg-slate-50 p-4"><dt class="text-xs font-bold uppercase text-slate-400">Status</dt><dd class="mt-1 font-semibold text-emerald-600">Active</dd></div>
+              </dl>
+              <button type="button" class="mt-6 flex items-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700" (click)="logout()"><lucide-icon [img]="LogOut" [size]="16" /> Log out</button>
+            </div>
+          </section>
         } @else {
         <p class="text-sm font-semibold text-brand-600">{{ currentDate }}</p>
         <h1 class="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">Make your next application count.</h1>
@@ -74,12 +90,13 @@ export class DashboardComponent implements OnInit {
   readonly FileSearch = FileSearch;
   readonly HelpCircle = HelpCircle;
   readonly Bell = Bell;
-  readonly ChevronDown = ChevronDown;
+  readonly LogOut = LogOut;
+  readonly UserRound = UserRound;
   
   readonly progress = signal(0);
   readonly analysis = signal<ResumeAnalysisResponse | null>(null);
   readonly currentResumeId = signal<number | null>(null);
-  readonly activeView = signal<'dashboard' | 'jobs'>('dashboard');
+  readonly activeView = signal<'dashboard' | 'jobs' | 'profile'>('dashboard');
   currentDate = '';
 
   ngOnInit(): void {
@@ -117,6 +134,10 @@ export class DashboardComponent implements OnInit {
 
   showJobs(): void {
     this.activeView.set('jobs');
+  }
+
+  showProfile(): void {
+    this.activeView.set('profile');
   }
 
   logout(): void {

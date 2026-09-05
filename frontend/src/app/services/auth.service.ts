@@ -25,6 +25,8 @@ export interface AuthResponse {
 
   fullName: string;
 
+  email: string;
+
   role: string;
 
   emailVerified: boolean;
@@ -47,6 +49,12 @@ export class AuthService {
   private readonly nameKey =
     'resume-pulse-name';
 
+  private readonly emailKey =
+    'resume-pulse-email';
+
+  private readonly roleKey =
+    'resume-pulse-role';
+
 
   readonly token =
     signal<string | null>(
@@ -62,6 +70,10 @@ export class AuthService {
         this.nameKey
       ) ?? ''
     );
+
+  readonly email = signal<string>(localStorage.getItem(this.emailKey) ?? '');
+
+  readonly role = signal<string>(localStorage.getItem(this.roleKey) ?? 'ROLE_USER');
 
 
   readonly isAuthenticated =
@@ -184,6 +196,9 @@ export class AuthService {
       this.nameKey
     );
 
+    localStorage.removeItem(this.emailKey);
+    localStorage.removeItem(this.roleKey);
+
 
     this.token.set(null);
 
@@ -217,6 +232,9 @@ export class AuthService {
       response.fullName ?? ''
     );
 
+    localStorage.setItem(this.emailKey, response.email ?? '');
+    localStorage.setItem(this.roleKey, response.role ?? 'ROLE_USER');
+
 
     this.token.set(
       response.accessToken
@@ -226,6 +244,9 @@ export class AuthService {
     this.fullName.set(
       response.fullName ?? ''
     );
+
+    this.email.set(response.email ?? '');
+    this.role.set(response.role ?? 'ROLE_USER');
   }
 
 }
