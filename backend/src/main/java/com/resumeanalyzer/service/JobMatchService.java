@@ -49,7 +49,19 @@ public class JobMatchService {
 
         List<JobMatchDto> matches = new ArrayList<>();
         Set<String> seenUrls = new HashSet<>();
-        for (int page = 1; page <= 25 && matches.size() < 1200; page++) {
+        collectArbeitnow(matches, seenUrls, resumeWords);
+        collectRemoteOk(matches, seenUrls, resumeWords);
+        collectRemotive(matches, seenUrls, resumeWords);
+        List<JobMatchDto> ranked = matches.stream()
+            .sorted(Comparator.comparingInt(JobMatchDto::matchPercentage).reversed())
+            .limit(1200)
+            .toList();
+        return ranked.isEmpty() ? fallbackJobs(resumeText) : ranked;
+        }
+
+        private void collectArbeitnow(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords) {
+        Set<String> seenPages = new HashSet<>();
+        for (int page = 1; page <= 100 && matches.size() < 1200; page++) {
             JsonNode root;
             try {
                 String separator = jobsFeedUrl.contains("?") ? "&" : "?";
@@ -58,11 +70,15 @@ public class JobMatchService {
                         .retrieve().body(JsonNode.class);
             } catch (RestClientException exception) {
                 if (page == 1) {
-                    return fallbackJobs(resumeText);
+                    return;
                 }
                 break;
             }
             if (root == null || !root.path("data").isArray() || root.path("data").isEmpty()) {
+                break;
+            }
+            String pageSignature = root.path("data").get(0).path("url").asText("") + ":" + root.path("data").size();
+            if (!seenPages.add(pageSignature)) {
                 break;
             }
 
@@ -76,20 +92,50 @@ public class JobMatchService {
                     if (title.isBlank() || applyUrl.isBlank() || !seenUrls.add(applyUrl)) {
                         continue;
                     }
-                    Set<String> jobWords = words(title + " " + description);
-                    long overlap = jobWords.stream().filter(resumeWords::contains).count();
-                    int score = Math.min(98, Math.max(25, 25 + (int) Math.round(73.0 * overlap / Math.max(1, Math.min(12, jobWords.size())))));
-                    matches.add(new JobMatchDto(title, company, location, clean(description), applyUrl, score, job.path("remote").asBoolean(false)));
+                    matches.add(toMatch(title, company, location, description, applyUrl, job.path("remote").asBoolean(false), resumeWords));
                 } catch (RuntimeException ignored) {
                     // Skip malformed third-party listings and keep the other jobs usable.
                 }
             }
         }
-        List<JobMatchDto> ranked = matches.stream()
-                .sorted(Comparator.comparingInt(JobMatchDto::matchPercentage).reversed())
-                .limit(1200)
-                .toList();
-        return ranked.isEmpty() ? fallbackJobs(resumeText) : ranked;
+    }
+
+    private void collectRemoteOk(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords) {
+        try {
+            JsonNode root = RestClient.builder().build().get().uri("https://remoteok.com/api")
+                    .header("User-Agent", "ResumePulse/1.0").retrieve().body(JsonNode.class);
+            if (root == null || !root.isArray()) return;
+            for (JsonNode job : root) {
+                String url = text(job, "url");
+                if (url.isBlank()) url = "https://remoteok.com/remote-jobs/" + text(job, "slug");
+                if (text(job, "position").isBlank() || !seenUrls.add(url)) continue;
+                matches.add(toMatch(text(job, "position"), text(job, "company"), text(job, "location"), text(job, "description"), url, true, resumeWords));
+            }
+        } catch (RestClientException ignored) {
+            // Arbeitnow and the resume-based fallback remain available when this feed is unavailable.
+        }
+    }
+
+    private void collectRemotive(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords) {
+        try {
+            JsonNode root = RestClient.builder().build().get().uri("https://remotive.com/api/remote-jobs?limit=100")
+                    .retrieve().body(JsonNode.class);
+            if (root == null || !root.path("jobs").isArray()) return;
+            for (JsonNode job : root.path("jobs")) {
+                String url = text(job, "url");
+                if (text(job, "title").isBlank() || url.isBlank() || !seenUrls.add(url)) continue;
+                matches.add(toMatch(text(job, "title"), text(job, "company_name"), text(job, "candidate_required_location"), text(job, "description"), url, true, resumeWords));
+            }
+        } catch (RestClientException ignored) {
+            // Keep the primary feed results when this feed is unavailable.
+        }
+    }
+
+    private JobMatchDto toMatch(String title, String company, String location, String description, String url, boolean remote, Set<String> resumeWords) {
+        Set<String> jobWords = words(title + " " + description);
+        long overlap = jobWords.stream().filter(resumeWords::contains).count();
+        int score = Math.min(98, Math.max(25, 25 + (int) Math.round(73.0 * overlap / Math.max(1, Math.min(12, jobWords.size())))));
+        return new JobMatchDto(title, company, location, clean(description), url, score, remote);
     }
 
     public List<JobMatchDto> fallbackMatches() {

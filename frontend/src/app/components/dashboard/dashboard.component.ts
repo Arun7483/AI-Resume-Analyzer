@@ -64,7 +64,11 @@ import { JobMatchesComponent } from '../job-matches/job-matches.component';
               </dl>
               <div class="mt-8 border-t border-slate-100 pt-6">
                 <div class="flex items-center justify-between gap-3"><h3 class="font-bold text-slate-900">Uploaded resumes</h3><span class="text-xs font-semibold text-slate-400">{{ resumeService.history().length }} files</span></div>
-                @if (resumeService.history().length) {
+                @if (resumeService.historyLoading()) {
+                  <p class="mt-3 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Loading uploaded resumes...</p>
+                } @else if (resumeService.historyError()) {
+                  <div class="mt-3 flex items-center justify-between gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-800"><span>{{ resumeService.historyError() }}</span><button type="button" class="shrink-0 font-bold text-brand-700 underline" (click)="resumeService.loadHistory()">Retry</button></div>
+                } @else if (resumeService.history().length) {
                   <div class="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
                     @for (resume of resumeService.history(); track resume.id) {
                       <div class="flex items-center justify-between gap-3 px-4 py-3"><div class="min-w-0"><p class="truncate text-sm font-semibold text-slate-800">{{ resume.fileName }}</p><p class="mt-1 text-xs text-slate-500">Uploaded {{ resume.uploadedAt | date:'medium' }}</p></div><span class="shrink-0 rounded-full bg-brand-50 px-2 py-1 text-xs font-bold text-brand-700">Resume {{ resume.id }}</span></div>
