@@ -9,6 +9,7 @@ import com.resumeanalyzer.security.CurrentUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,8 +32,6 @@ public class JobMatchService {
 
     private final ResumeRepository resumes;
     private final CurrentUser currentUser;
-    private final ObjectMapper objectMapper;
-
     private final RestClient jobsClient = RestClient.builder()
             .baseUrl("https://www.arbeitnow.com/api/job-board-api")
             .build();
@@ -41,7 +40,12 @@ public class JobMatchService {
         Resume resume = resumes.findTopByUserIdOrderByUploadedAtDesc(currentUser.require().getId())
                 .orElseThrow(() -> new IllegalStateException("Upload a resume before viewing job matches"));
 
-        JsonNode root = jobsClient.get().retrieve().body(JsonNode.class);
+        JsonNode root;
+        try {
+            root = jobsClient.get().retrieve().body(JsonNode.class);
+        } catch (RestClientException exception) {
+            return List.of();
+        }
         if (root == null || !root.path("data").isArray()) {
             return List.of();
         }

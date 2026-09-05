@@ -364,7 +364,7 @@ export class AuthComponent {
 
 
   readonly registerMode =
-    signal(false);
+    signal(this.route.snapshot.queryParamMap.get('mode') === 'register');
 
 
   readonly loading =

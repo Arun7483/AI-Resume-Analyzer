@@ -31,12 +31,12 @@ import { LucideAngularModule } from 'lucide-angular';
               Pricing
             </button>
             <button 
-              (click)="navigateTo('/auth')"
+              (click)="navigateTo('/auth?mode=login')"
               class="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">
               Sign in
             </button>
             <button 
-              (click)="navigateTo('/auth')"
+              (click)="navigateTo('/auth?mode=register')"
               class="rounded-lg bg-gradient-to-r from-brand-500 to-mint px-4 py-2 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-shadow">
               Get started
             </button>
@@ -63,7 +63,7 @@ import { LucideAngularModule } from 'lucide-angular';
           </p>
           <div class="mt-10 flex items-center justify-center gap-4">
             <button 
-              (click)="navigateTo('/auth')"
+              (click)="navigateTo('/auth?mode=register')"
               class="rounded-lg bg-gradient-to-r from-brand-500 to-mint px-6 py-3 text-base font-semibold text-white shadow-xl hover:shadow-2xl transition-all hover:scale-105">
               Start Free Analysis
             </button>
@@ -201,7 +201,7 @@ import { LucideAngularModule } from 'lucide-angular';
               Start getting AI-powered feedback on your resume today. It takes less than a minute to upload and get insights.
             </p>
             <button 
-              (click)="navigateTo('/auth')"
+              (click)="navigateTo('/auth?mode=register')"
               class="mt-8 inline-flex items-center rounded-lg bg-white px-6 py-3 text-base font-semibold text-brand-600 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
               Get Started Free
               <lucide-icon [img]="ArrowRight" class="ml-2" [size]="18" />
@@ -242,7 +242,7 @@ export class LandingComponent {
   readonly ArrowRight = ArrowRight;
 
   navigateTo(path: string): void {
-    this.router.navigate([path]);
+    void this.router.navigateByUrl(path);
   }
 
   scrollToSection(section: string): void {
