@@ -3,6 +3,9 @@ package com.resumeanalyzer.controller;
 import com.resumeanalyzer.dto.AuthRequest;
 import com.resumeanalyzer.dto.AuthResponse;
 import com.resumeanalyzer.dto.EmailVerificationRequest;
+import com.resumeanalyzer.dto.GoogleAuthRequest;
+import com.resumeanalyzer.dto.PasswordResetConfirmRequest;
+import com.resumeanalyzer.dto.PasswordResetRequest;
 import com.resumeanalyzer.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -60,4 +63,27 @@ public class AuthController {
                 authService.login(request)
         );
     }
+
+        @PostMapping("/google")
+        public ResponseEntity<AuthResponse> google(
+                        @Valid @RequestBody GoogleAuthRequest request
+        ) {
+                return ResponseEntity.ok(authService.googleLogin(request));
+        }
+
+        @PostMapping("/forgot-password")
+        public ResponseEntity<String> forgotPassword(
+                        @Valid @RequestBody PasswordResetRequest request
+        ) {
+                authService.requestPasswordReset(request.email());
+                return ResponseEntity.ok("If the account exists, a password reset email has been sent.");
+        }
+
+        @PostMapping("/reset-password")
+        public ResponseEntity<String> resetPassword(
+                        @Valid @RequestBody PasswordResetConfirmRequest request
+        ) {
+                authService.resetPassword(request.token(), request.password());
+                return ResponseEntity.ok("Password reset successfully. You can now sign in.");
+        }
 }

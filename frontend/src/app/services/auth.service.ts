@@ -143,6 +143,33 @@ export class AuthService {
       );
   }
 
+  googleLogin(credential: string) {
+    return this.http.post<AuthResponse>(
+      `${API_BASE_URL}/api/v1/auth/google`,
+      { credential }
+    ).pipe(
+      tap(response => {
+        if (response.accessToken && response.emailVerified) {
+          this.store(response);
+        }
+      })
+    );
+  }
+
+  requestPasswordReset(email: string) {
+    return this.http.post<string>(
+      `${API_BASE_URL}/api/v1/auth/forgot-password`,
+      { email: email.trim() }
+    );
+  }
+
+  resetPassword(token: string, password: string) {
+    return this.http.post<string>(
+      `${API_BASE_URL}/api/v1/auth/reset-password`,
+      { token, password }
+    );
+  }
+
 
   /*
    * LOGOUT

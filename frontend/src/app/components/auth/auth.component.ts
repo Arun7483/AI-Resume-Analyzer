@@ -8,6 +8,10 @@ import {
   FormsModule
 } from '@angular/forms';
 
+import { ActivatedRoute } from '@angular/router';
+
+import { Observable } from 'rxjs';
+
 import {
   LucideAngularModule,
   FileSearch,
@@ -87,6 +91,7 @@ import {
 
         <div
           class="mb-6 grid grid-cols-2 rounded-xl bg-slate-100 p-1"
+          [class.hidden]="forgotMode() || resetToken()"
         >
 
           <button
@@ -114,6 +119,21 @@ import {
 
         </div>
 
+        @if (!registerMode() && !forgotMode() && !resetToken()) {
+          <button type="button" class="mb-4 w-full rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-700" (click)="googleSignIn()">
+            Continue with Google
+          </button>
+          <button type="button" class="mb-4 w-full text-sm font-semibold text-brand-700" (click)="forgotMode.set(true); error.set(''); message.set('')">
+            Forgot password?
+          </button>
+        }
+
+        @if (registerMode() && !forgotMode() && !resetToken()) {
+          <button type="button" class="mb-4 w-full rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-700" (click)="googleSignIn()">
+            Sign up with Google
+          </button>
+        }
+
 
         <!-- FORM -->
 
@@ -125,7 +145,7 @@ import {
 
           <!-- FULL NAME -->
 
-          @if (registerMode()) {
+          @if (registerMode() && !forgotMode() && !resetToken()) {
 
             <label class="block">
 
@@ -167,6 +187,7 @@ import {
 
           <!-- EMAIL -->
 
+          @if (!resetToken()) {
           <label class="block">
 
             <span
@@ -202,10 +223,12 @@ import {
             </span>
 
           </label>
+          }
 
 
           <!-- PASSWORD -->
 
+          @if (!forgotMode() || resetToken()) {
           <label class="block">
 
             <span
@@ -242,6 +265,7 @@ import {
             </span>
 
           </label>
+          }
 
 
           <!-- MESSAGE -->
@@ -294,14 +318,24 @@ import {
             {{
               loading()
                 ? 'Please wait...'
-                : registerMode()
-                  ? 'Create account'
-                  : 'Sign in'
+                : forgotMode()
+                  ? 'Send reset email'
+                  : resetToken()
+                    ? 'Reset password'
+                    : registerMode()
+                      ? 'Create account'
+                      : 'Sign in'
             }}
 
           </button>
 
         </form>
+
+        @if (forgotMode() || resetToken()) {
+          <button type="button" class="mt-4 w-full text-sm font-semibold text-slate-600" (click)="forgotMode.set(false); resetToken.set(''); error.set(''); message.set('')">
+            Back to sign in
+          </button>
+        }
 
 
         <p
@@ -324,6 +358,8 @@ export class AuthComponent {
   readonly auth =
     inject(AuthService);
 
+  private readonly route = inject(ActivatedRoute);
+
 
   readonly registerMode =
     signal(false);
@@ -339,6 +375,12 @@ export class AuthComponent {
 
   readonly message =
     signal('');
+
+  readonly forgotMode = signal(false);
+
+  readonly resetToken = signal(
+    this.route.snapshot.queryParamMap.get('resetToken') ?? ''
+  );
 
 
   fullName = '';
@@ -387,8 +429,12 @@ export class AuthComponent {
     this.message.set('');
 
 
-    const request =
-      this.registerMode()
+    const request: Observable<any> =
+      this.forgotMode()
+        ? this.auth.requestPasswordReset(this.email)
+        : this.resetToken()
+          ? this.auth.resetPassword(this.resetToken(), this.password)
+          : this.registerMode()
 
         ? this.auth.register(
             this.fullName,
@@ -404,7 +450,17 @@ export class AuthComponent {
 
     request.subscribe({
 
-      next: response => {
+      next: (response: any) => {
+
+        if (this.forgotMode() || this.resetToken()) {
+          this.message.set(
+            this.forgotMode()
+              ? 'If the account exists, a password reset email has been sent.'
+              : 'Password reset successfully. You can now sign in.'
+          );
+          this.loading.set(false);
+          return;
+        }
 
         /*
          * Registration requiring
@@ -447,7 +503,7 @@ export class AuthComponent {
       },
 
 
-      error: response => {
+      error: (response: any) => {
 
         console.error(
           'Authentication error:',
@@ -472,6 +528,29 @@ export class AuthComponent {
       }
 
     });
+  }
+
+  googleSignIn(): void {
+    const clientId = document.querySelector('meta[name="google-client-id"]')?.getAttribute('content');
+    const google = (globalThis as any).google;
+    if (!clientId || clientId.startsWith('__') || !google?.accounts?.id) {
+      this.error.set('Google sign-in is not configured yet.');
+      return;
+    }
+    google.accounts.id.initialize({
+      client_id: clientId,
+      callback: (response: { credential: string }) => {
+        this.loading.set(true);
+        this.auth.googleLogin(response.credential).subscribe({
+          next: () => window.location.assign('/dashboard'),
+          error: error => {
+            this.error.set(this.getErrorMessage(error));
+            this.loading.set(false);
+          }
+        });
+      }
+    });
+    google.accounts.id.prompt();
   }
 
 
