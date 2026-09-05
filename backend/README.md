@@ -41,6 +41,7 @@ BACKEND_URL=http://localhost:8080
 FRONTEND_URL=http://localhost:4200
 GROQ_API_KEY=YOUR_GROQ_KEY
 GROQ_MODEL=llama-3.3-70b-versatile
+JSEARCH_API_KEY=YOUR_RAPIDAPI_JSEARCH_KEY
 ```
 
 For the hosted Aiven database, replace only the database values with:
@@ -66,6 +67,10 @@ mvn spring-boot:run
 ```
 
 The local JWT fallback is only for development. Never use it in Render; keep a strong `JWT_SECRET` configured there.
+
+### Live job listings
+
+The public feeds are best-effort and may return fewer than 1,000 records or be blocked by a hosting provider. For a large set of real listings, create a RapidAPI JSearch subscription and add `JSEARCH_API_KEY` to the IntelliJ or Render environment. The backend queries multiple resume-derived role searches, deduplicates application URLs, and ranks the combined results against the uploaded resume. Groq is used for resume analysis/chat; it is not a live job database.
 
 For the Aiven database, configure these three Render variables. Convert its Service URI from `postgres://` to a JDBC URL without credentials and keep the SSL query parameter:
 

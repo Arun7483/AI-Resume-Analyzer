@@ -52,6 +52,7 @@ public class JobMatchService {
 
         List<JobMatchDto> matches = new ArrayList<>();
         Set<String> seenUrls = new HashSet<>();
+        collectJSearch(matches, seenUrls, resumeWords, detectRoles(resumeText.toLowerCase(Locale.ROOT)));
         collectArbeitnow(matches, seenUrls, resumeWords);
         collectRemoteOk(matches, seenUrls, resumeWords);
         collectRemotive(matches, seenUrls, resumeWords);
@@ -61,6 +62,38 @@ public class JobMatchService {
             .toList();
         return ranked.isEmpty() ? fallbackJobs(resumeText) : ranked;
         }
+
+    @Value("${app.jobs.jsearch-api-key:}")
+    private String jsearchApiKey;
+
+    private void collectJSearch(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords, List<String> roles) {
+        if (jsearchApiKey == null || jsearchApiKey.isBlank()) return;
+        try {
+            RestClient client = RestClient.builder()
+                    .baseUrl("https://jsearch.p.rapidapi.com")
+                    .defaultHeader("X-RapidAPI-Key", jsearchApiKey)
+                    .defaultHeader("X-RapidAPI-Host", "jsearch.p.rapidapi.com")
+                    .build();
+            for (String role : roles.stream().limit(8).toList()) {
+                JsonNode root = client.get().uri(uriBuilder -> uriBuilder.path("/search")
+                        .queryParam("query", role)
+                        .queryParam("page", 1)
+                        .queryParam("num_pages", 20)
+                        .build()).retrieve().body(JsonNode.class);
+                if (root == null || !root.path("data").isArray()) continue;
+                for (JsonNode job : root.path("data")) {
+                    String url = text(job, "job_apply_link");
+                    String title = text(job, "job_title");
+                    if (title.isBlank() || url.isBlank() || !seenUrls.add(url)) continue;
+                    String location = text(job, "job_city") + ", " + text(job, "job_country");
+                    matches.add(toMatch(title, text(job, "employer_name"), location,
+                            text(job, "job_description"), url, job.path("job_is_remote").asBoolean(false), resumeWords));
+                }
+            }
+        } catch (RuntimeException exception) {
+            log.warn("JSearch provider unavailable: {}", exception.getMessage());
+        }
+    }
 
         private void collectArbeitnow(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords) {
         Set<String> seenPages = new HashSet<>();
