@@ -7,6 +7,7 @@ import com.resumeanalyzer.entity.Resume;
 import com.resumeanalyzer.repository.ResumeRepository;
 import com.resumeanalyzer.security.CurrentUser;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -24,6 +25,7 @@ import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class JobMatchService {
 
     private static final Pattern WORDS = Pattern.compile("[a-zA-Z][a-zA-Z+#.-]{3,}");
@@ -79,6 +81,7 @@ public class JobMatchService {
                         addArbeitnowJob(matches, seenUrls, resumeWords, job);
                     }
                 } catch (RuntimeException exception) {
+                    log.warn("Arbeitnow jobs feed failed on page {} using {}: {}", page, jobsFeedUrl, exception.getMessage());
                 if (page == 1) {
                     return;
                 }
@@ -115,6 +118,7 @@ public class JobMatchService {
                 matches.add(toMatch(text(job, "position"), text(job, "company"), text(job, "location"), text(job, "description"), url, true, resumeWords));
             }
         } catch (RestClientException ignored) {
+            log.warn("Remote OK jobs feed unavailable: {}", ignored.getMessage());
             // Arbeitnow and the resume-based fallback remain available when this feed is unavailable.
         }
     }
@@ -130,6 +134,7 @@ public class JobMatchService {
                 matches.add(toMatch(text(job, "title"), text(job, "company_name"), text(job, "candidate_required_location"), text(job, "description"), url, true, resumeWords));
             }
         } catch (RestClientException ignored) {
+            log.warn("Remotive jobs feed unavailable: {}", ignored.getMessage());
             // Keep the primary feed results when this feed is unavailable.
         }
     }

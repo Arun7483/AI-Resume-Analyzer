@@ -36,7 +36,13 @@ import { JobsService } from '../../services/jobs.service';
           <p class="mt-1 text-sm text-slate-500">Refresh in a moment, or upload a resume and try again after analysis finishes.</p>
         </div>
       } @else {
-        <div class="mt-8 grid gap-4 lg:grid-cols-2">
+        <div class="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
+          <p class="text-xs font-semibold text-slate-500">Sort resume matches</p>
+          <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700" [value]="sortMode()" (change)="setSortMode($any($event.target).value)">
+            <option value="match">Best resume match</option><option value="title">Job title A-Z</option>
+          </select>
+        </div>
+        <div class="mt-4 grid gap-4 lg:grid-cols-2">
           @for (job of visibleJobs(); track job.applyUrl) {
             <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
               <div class="flex items-start justify-between gap-4">
@@ -76,7 +82,14 @@ export class JobMatchesComponent {
   readonly RefreshCw = RefreshCw;
   readonly Sparkles = Sparkles;
   readonly visibleCount = signal(24);
-  readonly visibleJobs = computed(() => this.jobs.jobs().slice(0, this.visibleCount()));
+  readonly sortMode = signal<'match' | 'title'>('match');
+  readonly sortedJobs = computed(() => {
+    const jobs = [...this.jobs.jobs()];
+    if (this.sortMode() === 'title') jobs.sort((left, right) => left.title.localeCompare(right.title));
+    if (this.sortMode() === 'match') jobs.sort((left, right) => right.matchPercentage - left.matchPercentage);
+    return jobs;
+  });
+  readonly visibleJobs = computed(() => this.sortedJobs().slice(0, this.visibleCount()));
   readonly isSearchFallback = computed(() => this.jobs.jobs().length > 0 && this.jobs.jobs().every(job => job.company.includes('active job search')));
 
   ngOnInit(): void {
@@ -90,5 +103,10 @@ export class JobMatchesComponent {
 
   showMore(): void {
     this.visibleCount.update(value => value + 24);
+  }
+
+  setSortMode(mode: 'match' | 'title'): void {
+    this.sortMode.set(mode);
+    this.visibleCount.set(24);
   }
 }
