@@ -1,5 +1,6 @@
 export interface JobMatch {
   jobId: string;
+  provider: string;
   title: string;
   company: string;
   location: string;

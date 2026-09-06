@@ -67,6 +67,12 @@ services:
       - key: ADZUNA_APP_KEY
         sync: false
 
+      - key: ADZUNA_COUNTRY
+        value: in
+
+      - key: JOOBLE_API_KEY
+        sync: false
+
       - key: GOOGLE_CLIENT_ID
         sync: false
 

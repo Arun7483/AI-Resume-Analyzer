@@ -11,6 +11,8 @@ export DB_PASSWORD='change-me'
 export JWT_SECRET="$(openssl rand -base64 64)"
 export ADZUNA_APP_ID='...'
 export ADZUNA_APP_KEY='...'
+export ADZUNA_COUNTRY='in'
+export JOOBLE_API_KEY='...'
 export RESUME_STORAGE_PATH='/var/lib/resume-analyzer/uploads'
 export GROQ_API_KEY='...'
 export GROQ_MODEL='llama-3.3-70b-versatile'
@@ -45,6 +47,8 @@ GROQ_API_KEY=YOUR_GROQ_KEY
 GROQ_MODEL=llama-3.3-70b-versatile
 ADZUNA_APP_ID=YOUR_ADZUNA_APP_ID
 ADZUNA_APP_KEY=YOUR_ADZUNA_APP_KEY
+ADZUNA_COUNTRY=in
+JOOBLE_API_KEY=YOUR_JOOBLE_API_KEY
 ```
 
 For the hosted Aiven database, replace only the database values with:
@@ -73,7 +77,7 @@ The local JWT fallback is only for development. Never use it in Render; keep a s
 
 ### Live job listings
 
-Adzuna is the sole live-job provider. Set `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` in the IntelliJ or Render environment; never commit them. The backend aggregates a bounded number of resume-derived Adzuna searches, deduplicates actual listings, and ranks the combined results. Groq is used for resume analysis/chat and profile enrichment; it is not a live job database.
+Adzuna, Jooble, and Jobicy are the live-job providers. Adzuna requires `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, and `ADZUNA_COUNTRY`; Jooble requires `JOOBLE_API_KEY`; Jobicy is public and requires no key. Never commit provider credentials. The backend aggregates a bounded number of resume-derived searches, normalizes actual listings, deduplicates them, and ranks the combined results. Groq is used for resume analysis/chat and profile enrichment; it is not a live job database.
 
 For the Aiven database, configure these three Render variables. Convert its Service URI from `postgres://` to a JDBC URL without credentials and keep the SSL query parameter:
 
@@ -104,7 +108,7 @@ Create the app password in the Google Account security settings after enabling 2
 - `POST /api/v1/auth/register` — email, password, and fullName
 - `POST /api/v1/auth/login` — email and password
 - `POST /api/v1/resumes/upload` — multipart `file` and optional `jobDescription`
-- `GET /api/v1/resumes/job-matches?page=0&size=24` — paged, deduplicated individual Adzuna listings ranked against the latest uploaded resume
+- `GET /api/v1/resumes/job-matches?page=0&size=24` — paged, deduplicated individual Adzuna, Jooble, and Jobicy listings ranked against the latest uploaded resume
 - `POST /api/v1/chat` — prompt and optional resumeId
 
 All resume, job-match, and chat endpoints require `Authorization: Bearer <token>`. Ownership is derived from the authenticated principal rather than request-provided user IDs. Job applications open on the original listing site through each returned `applyUrl`.

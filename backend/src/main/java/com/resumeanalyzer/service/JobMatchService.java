@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.util.*;
+import java.time.Instant;
 import java.util.regex.Pattern;
 
 /** Retrieves and ranks only individual listings supplied by Adzuna. */
@@ -34,6 +35,10 @@ public class JobMatchService {
     @Value("${app.jobs.adzuna-country:in}") private String adzunaCountry;
     @Value("${app.jobs.adzuna-max-pages-per-query:3}") private int maxPagesPerQuery;
     @Value("${app.jobs.adzuna-max-roles-per-query:6}") private int maxRolesPerQuery;
+    @Value("${app.jobs.jooble-api-key:}") private String joobleApiKey;
+    @Value("${app.jobs.jooble-max-roles-per-query:3}") private int joobleMaxRolesPerQuery;
+    @Value("${app.jobs.jooble-location:India}") private String joobleLocation;
+    @Value("${app.jobs.jobicy-base-url:https://jobicy.com/api/v2/remote-jobs}") private String jobicyBaseUrl;
     @Value("${spring.ai.openai.api-key:}") private String groqApiKey;
 
     public synchronized JobMatchPageDto findMatches(int page, int size) {
@@ -48,39 +53,119 @@ public class JobMatchService {
     }
 
     private List<JobMatchDto> loadMatches(Resume resume) {
-        if (adzunaAppId == null || adzunaAppId.isBlank() || adzunaAppKey == null || adzunaAppKey.isBlank()) throw new JobFeedUnavailableException("Live job feed is not configured. Set ADZUNA_APP_ID and ADZUNA_APP_KEY and try again.");
         CandidateProfile profile = enrichWithGroq(resume.getRawText(), CandidateProfile.from(resume.getRawText()));
         if (profile.roles.isEmpty()) throw new BadRequestException("We could not identify a job domain from this resume yet");
-        RestClient client = RestClient.builder().baseUrl("https://api.adzuna.com/v1/api").defaultHeader("Accept", "application/json").build();
-        Map<String, JobMatchDto> unique = new LinkedHashMap<>(); boolean responded = false;
-        try {
-            for (String role : profile.roles.stream().limit(Math.max(1, maxRolesPerQuery)).toList()) for (int providerPage = 1; providerPage <= Math.max(1, maxPagesPerQuery); providerPage++) {
-                final int adzunaPage = providerPage;
-                JsonNode root = client.get().uri(b -> b.path("/jobs/{country}/search/{page}")
-                                .queryParam("app_id", adzunaAppId).queryParam("app_key", adzunaAppKey).queryParam("what", role)
-                                .queryParam("results_per_page", 20).queryParam("content-type", "application/json").build(adzunaCountry, adzunaPage))
-                        .retrieve().body(JsonNode.class);
-                responded = true; JsonNode data = root == null ? null : root.path("results");
-                if (data == null || !data.isArray() || data.isEmpty()) break;
-                for (JsonNode job : data) addAdzunaJob(unique, job, profile);
-            }
-        } catch (RestClientException | IllegalStateException exception) {
-            log.warn("Adzuna request failed for country {}: {}", adzunaCountry, exception.getMessage());
-            throw new JobFeedUnavailableException("The live Adzuna feed is temporarily unavailable. Please try again later.");
-        }
-        if (!responded) throw new JobFeedUnavailableException("The live Adzuna feed returned no response. Please try again later.");
-        return unique.values().stream().distinct().sorted(Comparator.comparingInt(JobMatchDto::matchPercentage).reversed()).toList();
+        Map<String, JobMatchDto> unique = new LinkedHashMap<>();
+        Set<String> dedupeKeys = new HashSet<>();
+        int successfulProviders = 0;
+        if (hasAdzunaCredentials()) {
+            try { fetchAdzuna(unique, dedupeKeys, profile); successfulProviders++; }
+            catch (RuntimeException exception) { log.warn("Adzuna feed failed for country {}: {}", adzunaCountry, exception.getMessage()); }
+        } else log.warn("Adzuna feed is not configured");
+        if (joobleApiKey != null && !joobleApiKey.isBlank()) {
+            try { fetchJooble(unique, dedupeKeys, profile); successfulProviders++; }
+            catch (RuntimeException exception) { log.warn("Jooble feed failed: {}", exception.getMessage()); }
+        } else log.warn("Jooble feed is not configured");
+        try { fetchJobicy(unique, dedupeKeys, profile); successfulProviders++; }
+        catch (RuntimeException exception) { log.warn("Jobicy feed failed: {}", exception.getMessage()); }
+        if (successfulProviders == 0) throw new JobFeedUnavailableException("All live job feeds are unavailable or not configured. Configure Adzuna, Jooble, or Jobicy and try again.");
+        return unique.values().stream().sorted(Comparator.comparingInt(JobMatchDto::matchPercentage).thenComparing(this::freshness).reversed()).toList();
     }
 
-    private void addAdzunaJob(Map<String, JobMatchDto> unique, JsonNode job, CandidateProfile profile) {
+    private boolean hasAdzunaCredentials() { return adzunaAppId != null && !adzunaAppId.isBlank() && adzunaAppKey != null && !adzunaAppKey.isBlank(); }
+
+    private void fetchAdzuna(Map<String, JobMatchDto> unique, Set<String> dedupeKeys, CandidateProfile profile) {
+        RestClient client = RestClient.builder().baseUrl("https://api.adzuna.com/v1/api").defaultHeader("Accept", "application/json").build();
+        final String appId = adzunaAppId, appKey = adzunaAppKey, country = adzunaCountry;
+        for (String role : profile.roles.stream().limit(Math.max(1, maxRolesPerQuery)).toList()) for (int providerPage = 1; providerPage <= Math.max(1, maxPagesPerQuery); providerPage++) {
+            final String finalRole = role; final int finalPage = providerPage;
+            JsonNode root = client.get().uri(b -> b.path("/jobs/{country}/search/{page}")
+                            .queryParam("app_id", appId).queryParam("app_key", appKey).queryParam("what", finalRole)
+                            .queryParam("results_per_page", 20).queryParam("content-type", "application/json").build(country, finalPage))
+                    .retrieve().body(JsonNode.class);
+            JsonNode data = root == null ? null : root.path("results");
+            if (data == null || !data.isArray() || data.isEmpty()) break;
+            for (JsonNode job : data) addAdzunaJob(unique, dedupeKeys, job, profile);
+        }
+    }
+
+    private void fetchJooble(Map<String, JobMatchDto> unique, Set<String> dedupeKeys, CandidateProfile profile) {
+        String baseUrl = "India".equalsIgnoreCase(joobleLocation) || "in".equalsIgnoreCase(adzunaCountry) ? "https://in.jooble.org" : "https://jooble.org";
+        RestClient client = RestClient.builder().baseUrl(baseUrl).defaultHeader("Accept", "application/json").build();
+        for (String role : profile.roles.stream().limit(Math.max(1, joobleMaxRolesPerQuery)).toList()) {
+            Map<String, Object> request = Map.of("keywords", role, "location", joobleLocation, "page", 1, "ResultOnPage", 20);
+            JsonNode root = client.post().uri("/api/" + joobleApiKey).body(request).retrieve().body(JsonNode.class);
+            JsonNode jobs = root == null ? null : root.path("jobs");
+            if (jobs == null || !jobs.isArray()) continue;
+            for (JsonNode job : jobs) addJoobleJob(unique, dedupeKeys, job, profile);
+        }
+    }
+
+    private void fetchJobicy(Map<String, JobMatchDto> unique, Set<String> dedupeKeys, CandidateProfile profile) {
+        RestClient client = RestClient.builder().build();
+        String geo = "in".equalsIgnoreCase(adzunaCountry) ? "india" : "";
+        Set<String> tags = profile.roles.stream().limit(Math.max(1, Math.min(3, joobleMaxRolesPerQuery))).map(this::jobicyTag).collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        for (String tag : tags) {
+            String uri = jobicyBaseUrl + "?count=50&tag=" + java.net.URLEncoder.encode(tag, java.nio.charset.StandardCharsets.UTF_8);
+            if (!geo.isBlank()) uri += "&geo=" + geo;
+            JsonNode root = client.get().uri(uri).retrieve().body(JsonNode.class);
+            JsonNode jobs = root == null ? null : root.path("jobs");
+            if (jobs == null || !jobs.isArray()) continue;
+            for (JsonNode job : jobs) addJobicyJob(unique, dedupeKeys, job, profile);
+        }
+    }
+
+    private String jobicyTag(String role) { return role.length() > 50 ? role.substring(0, 50) : role; }
+
+    private void addAdzunaJob(Map<String, JobMatchDto> unique, Set<String> dedupeKeys, JsonNode job, CandidateProfile profile) {
         String title = text(job,"title"), applyUrl = text(job,"redirect_url"), jobId = text(job,"id");
-        if (title.isBlank() || applyUrl.isBlank()) return;
+        if (title.isBlank() || !validUrl(applyUrl)) return;
         String company = text(job.path("company"),"display_name"), location = text(job.path("location"),"display_name");
-        String key = !jobId.isBlank() ? "id:" + jobId : "url:" + normalUrl(applyUrl), fallback = "fallback:" + normal(title) + "|" + normal(company) + "|" + normal(location);
-        if (unique.containsKey(key) || unique.containsKey("url:" + normalUrl(applyUrl)) || unique.containsKey(fallback)) return;
-        String description = clean(text(job,"description")); MatchDetails match = score(profile, title, description, location, false);
-        JobMatchDto listing = new JobMatchDto(jobId,title,company,location,adzunaCountry.toUpperCase(Locale.ROOT),description,applyUrl,"Adzuna",text(job.path("category"),"label"),text(job,"created"),contract(job),number(job,"salary_min"),number(job,"salary_max"),"",false,match.score,match.matched,match.missing);
-        unique.put(key, listing); unique.put("url:" + normalUrl(applyUrl), listing); unique.put(fallback, listing);
+        String key = !jobId.isBlank() ? "ADZUNA:id:" + jobId : "ADZUNA:url:" + normalUrl(applyUrl), fallback = "fallback:" + normal(title) + "|" + normal(company) + "|" + normal(location);
+        if (isDuplicate(dedupeKeys, key, "url:" + normalUrl(applyUrl), fallback)) return;
+        String description = clean(text(job,"description")); if (description.isBlank()) return; MatchDetails match = score(profile, title, description, location, false);
+        JobMatchDto listing = new JobMatchDto(jobId,"Adzuna",title,company,location,"",description,applyUrl,"Adzuna",text(job.path("category"),"label"),parseDate(text(job,"created")),contract(job),number(job,"salary_min"),number(job,"salary_max"),"",false,match.score,match.matched,match.missing);
+        putJob(unique, dedupeKeys, key, "url:" + normalUrl(applyUrl), fallback, listing);
+    }
+
+    private void addJoobleJob(Map<String, JobMatchDto> unique, Set<String> dedupeKeys, JsonNode job, CandidateProfile profile) {
+        String title = text(job, "title"), company = text(job, "company"), location = text(job, "location"), description = clean(text(job, "snippet")), applyUrl = text(job, "link"), jobId = text(job, "id");
+        if (title.isBlank() || description.isBlank() || !validUrl(applyUrl)) return;
+        String key = !jobId.isBlank() ? "JOOBLE:id:" + jobId : "JOOBLE:url:" + normalUrl(applyUrl);
+        String fallback = "fallback:" + normal(title) + "|" + normal(company) + "|" + normal(location);
+        if (isDuplicate(dedupeKeys, key, "url:" + normalUrl(applyUrl), fallback)) return;
+        MatchDetails match = score(profile, title, description, location, false);
+        JobMatchDto listing = new JobMatchDto(jobId, "Jooble", title, company, location, "", description, applyUrl, text(job, "source"), "", parseDate(text(job, "updated")), text(job, "type"), null, null, "", false, match.score, match.matched, match.missing);
+        putJob(unique, dedupeKeys, key, "url:" + normalUrl(applyUrl), fallback, listing);
+    }
+
+    private void addJobicyJob(Map<String, JobMatchDto> unique, Set<String> dedupeKeys, JsonNode job, CandidateProfile profile) {
+        String title = text(job, "jobTitle"), company = text(job, "companyName"), location = text(job, "jobGeo"), applyUrl = text(job, "url"), jobId = text(job, "id");
+        String description = clean(text(job, "jobDescription")); if (description.isBlank()) description = clean(text(job, "jobExcerpt"));
+        if (title.isBlank() || description.isBlank() || !validUrl(applyUrl)) return;
+        String key = !jobId.isBlank() ? "JOBICY:id:" + jobId : "JOBICY:url:" + normalUrl(applyUrl);
+        String fallback = "fallback:" + normal(title) + "|" + normal(company) + "|" + normal(location);
+        if (isDuplicate(dedupeKeys, key, "url:" + normalUrl(applyUrl), fallback)) return;
+        MatchDetails match = score(profile, title, description, location, true);
+        JobMatchDto listing = new JobMatchDto(jobId, "Jobicy", title, company, location, "", description, applyUrl, "Jobicy", arrayText(job, "jobIndustry"), parseDate(text(job, "pubDate")), arrayText(job, "jobType"), number(job, "salaryMin"), number(job, "salaryMax"), text(job, "salaryCurrency"), true, match.score, match.matched, match.missing);
+        putJob(unique, dedupeKeys, key, "url:" + normalUrl(applyUrl), fallback, listing);
+    }
+
+    private void putJob(Map<String, JobMatchDto> unique, Set<String> dedupeKeys, String primary, String urlKey, String fallback, JobMatchDto job) {
+        unique.put(primary, job); dedupeKeys.add(primary); dedupeKeys.add(urlKey); dedupeKeys.add(fallback);
+    }
+    private boolean isDuplicate(Set<String> keys, String primary, String urlKey, String fallback) { return keys.contains(primary) || keys.contains(urlKey) || keys.contains(fallback); }
+    private boolean validUrl(String value) { try { java.net.URI uri = java.net.URI.create(value); return ("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) && uri.getHost() != null; } catch (IllegalArgumentException exception) { return false; } }
+    private String arrayText(JsonNode node, String field) { JsonNode value = node.path(field); if (value.isArray()) { List<String> values = new ArrayList<>(); value.forEach(item -> values.add(item.asText(""))); return String.join(", ", values); } return value.asText(""); }
+    private Instant freshness(JobMatchDto job) { try { return job.postedAt() == null || job.postedAt().isBlank() ? Instant.MIN : Instant.parse(job.postedAt()); } catch (RuntimeException exception) { return Instant.MIN; } }
+
+    private String parseDate(String value) {
+        if (value == null || value.isBlank()) return "";
+        try { return Instant.parse(value).toString(); } catch (Exception e1) {
+            try { return java.time.LocalDateTime.parse(value.replace(" ", "T")).atZone(java.time.ZoneId.systemDefault()).toInstant().toString(); } catch (Exception e2) {
+                try { return java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.parse(value, Instant::from).toString(); } catch (Exception e3) { return ""; }
+            }
+        }
     }
 
     private MatchDetails score(CandidateProfile profile, String title, String description, String location, boolean remote) {
