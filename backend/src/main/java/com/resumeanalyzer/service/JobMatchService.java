@@ -55,9 +55,10 @@ public class JobMatchService {
         Map<String, JobMatchDto> unique = new LinkedHashMap<>(); boolean responded = false;
         try {
             for (String role : profile.roles.stream().limit(Math.max(1, maxRolesPerQuery)).toList()) for (int providerPage = 1; providerPage <= Math.max(1, maxPagesPerQuery); providerPage++) {
+                final int adzunaPage = providerPage;
                 JsonNode root = client.get().uri(b -> b.path("/jobs/{country}/search/{page}")
                                 .queryParam("app_id", adzunaAppId).queryParam("app_key", adzunaAppKey).queryParam("what", role)
-                                .queryParam("results_per_page", 20).queryParam("content-type", "application/json").build(adzunaCountry, providerPage))
+                                .queryParam("results_per_page", 20).queryParam("content-type", "application/json").build(adzunaCountry, adzunaPage))
                         .retrieve().body(JsonNode.class);
                 responded = true; JsonNode data = root == null ? null : root.path("results");
                 if (data == null || !data.isArray() || data.isEmpty()) break;
