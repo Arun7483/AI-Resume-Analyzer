@@ -55,7 +55,6 @@ public class Resume {
     )
     private String storageKey;
 
-    @Lob
     @Column(
             name = "raw_text",
             nullable = false,

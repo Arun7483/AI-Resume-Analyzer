@@ -168,6 +168,10 @@ export class AuthService {
     );
   }
 
+  resendVerification(email: string) {
+    return this.http.post<string>(`${API_BASE_URL}/api/v1/auth/resend-verification`, { email: email.trim() });
+  }
+
   requestPasswordReset(email: string) {
     return this.http.post<string>(
       `${API_BASE_URL}/api/v1/auth/forgot-password`,

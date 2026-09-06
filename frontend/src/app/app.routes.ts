@@ -11,6 +11,7 @@ import {
 import {
   DashboardComponent
 } from './components/dashboard/dashboard.component';
+import { authGuard } from './auth.guard';
 
 
 export const APP_ROUTES: Routes = [
@@ -38,8 +39,13 @@ export const APP_ROUTES: Routes = [
    */
   {
     path: 'dashboard',
-    component: DashboardComponent
+    component: DashboardComponent,
+    canActivate: [authGuard]
   },
+  { path: 'jobs', component: DashboardComponent, canActivate: [authGuard] },
+  { path: 'profile', component: DashboardComponent, canActivate: [authGuard] },
+  { path: 'resumes', component: DashboardComponent, canActivate: [authGuard] },
+  { path: 'chat', component: DashboardComponent, canActivate: [authGuard] },
 
 
   /*

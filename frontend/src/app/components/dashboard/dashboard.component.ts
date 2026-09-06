@@ -1,4 +1,5 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { BriefcaseBusiness, FileSearch, LogOut, UserRound, LucideAngularModule } from 'lucide-angular';
 import { AnalysisDashboardComponent } from '../analysis-dashboard/analysis-dashboard.component';
@@ -101,6 +102,7 @@ import { JobMatchesComponent } from '../job-matches/job-matches.component';
 })
 export class DashboardComponent implements OnInit {
   readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   readonly resumeService = inject(ResumeService);
   readonly FileSearch = FileSearch;
   readonly BriefcaseBusiness = BriefcaseBusiness;
@@ -114,6 +116,8 @@ export class DashboardComponent implements OnInit {
   currentDate = '';
 
   ngOnInit(): void {
+    if (this.router.url.startsWith('/jobs')) this.activeView.set('jobs');
+    if (this.router.url.startsWith('/profile')) this.activeView.set('profile');
     this.updateCurrentDate();
     this.resumeService.loadHistory();
     setInterval(() => this.updateCurrentDate(), 60000); // Update every minute

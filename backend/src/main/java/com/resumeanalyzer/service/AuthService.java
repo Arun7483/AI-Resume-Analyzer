@@ -46,15 +46,19 @@ public class AuthService {
             throw new BadRequestException("An account already exists for this email");
         }
 
-        User user = users.save(User.builder()
+        User user = User.builder()
                 .email(email)
                 .password(encoder.encode(request.password()))
                 .fullName(request.fullName().trim())
                 .role(User.Role.ROLE_USER)
-                .emailVerified(true)
-                .build());
-
-            return response(user);
+                .emailVerified(false)
+                .verificationToken(UUID.randomUUID().toString())
+                .verificationExpiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
+                .build();
+        user = users.save(user);
+        verification.send(user);
+        return new AuthResponse(null, "Bearer", 0, user.getFullName(), user.getEmail(), user.getRole().name(), false,
+                "Account created. Check your email to verify your account before signing in.");
     }
 
     @Transactional
@@ -159,7 +163,7 @@ public class AuthService {
     private AuthResponse response(User user) {
         String token = jwt.generate(user);
         return new AuthResponse(token, "Bearer", jwt.expirationSeconds(), user.getFullName(), user.getEmail(),
-            user.getRole().name(), true, "Login successful");
+            user.getRole().name(), user.isEmailVerified(), "Login successful");
     }
 
     private String value(java.util.Map<?, ?> claims, String key) {

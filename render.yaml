@@ -13,7 +13,7 @@ services:
 
     envVars:
       - key: PORT
-        value: 8080
+        value: 10000
 
       - key: SPRING_PROFILES_ACTIVE
         value: prod
@@ -46,13 +46,13 @@ services:
       # -------------------------------------------------
 
       - key: CORS_ALLOWED_ORIGIN
-        value: https://resume-pulse-frontend-bbep.onrender.com
+        sync: false
 
       - key: BACKEND_URL
-        value: https://resume-analyzer-api-bbep.onrender.com
+        sync: false
 
       - key: FRONTEND_URL
-        value: https://resume-pulse-frontend-bbep.onrender.com
+        sync: false
 
       # -------------------------------------------------
       # GROQ
@@ -61,41 +61,16 @@ services:
       - key: GROQ_API_KEY
         sync: false
 
-      - key: JOBS_FEED_URL
-        value: https://www.arbeitnow.com/api/job-board-api
+      - key: ADZUNA_APP_ID
+        sync: false
 
-      - key: JSEARCH_API_KEY
+      - key: ADZUNA_APP_KEY
         sync: false
 
       - key: GOOGLE_CLIENT_ID
         sync: false
 
       - key: RESEND_API_KEY
-        sync: false
-
-      # -------------------------------------------------
-      # EMAIL / SMTP
-      # -------------------------------------------------
-
-      - key: MAIL_HOST
-        value: smtp.gmail.com
-
-      - key: MAIL_PORT
-        value: 465
-
-      - key: MAIL_SSL_ENABLE
-        value: "true"
-
-      - key: MAIL_STARTTLS_ENABLE
-        value: "false"
-
-      - key: MAIL_STARTTLS_REQUIRED
-        value: "false"
-
-      - key: MAIL_USERNAME
-        sync: false
-
-      - key: MAIL_PASSWORD
         sync: false
 
       - key: MAIL_FROM
@@ -122,7 +97,7 @@ services:
 
     envVars:
       - key: API_URL
-        value: https://resume-analyzer-api-bbep.onrender.com
+        sync: false
 
       - key: GOOGLE_CLIENT_ID
         sync: false

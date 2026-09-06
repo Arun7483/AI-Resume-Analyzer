@@ -331,6 +331,10 @@ import {
 
         </form>
 
+        @if (registerMode() && message() && !loading()) {
+          <button type="button" class="mt-4 w-full text-sm font-semibold text-brand-700" (click)="resendVerification()">Resend verification email</button>
+        }
+
         @if (forgotMode() || resetToken()) {
           <button type="button" class="mt-4 w-full text-sm font-semibold text-slate-600" (click)="forgotMode.set(false); resetToken.set(''); error.set(''); message.set('')">
             Back to sign in
@@ -383,6 +387,12 @@ export class AuthComponent {
   readonly resetToken = signal(
     this.route.snapshot.queryParamMap.get('resetToken') ?? ''
   );
+
+  constructor() {
+    if (this.route.snapshot.queryParamMap.get('verified') === 'true') {
+      this.message.set('Email verified successfully. You can now sign in.');
+    }
+  }
 
 
   fullName = '';
@@ -560,6 +570,15 @@ export class AuthComponent {
       }
     });
     google.accounts.id.prompt();
+  }
+
+  resendVerification(): void {
+    if (!this.email.trim()) { this.error.set('Enter your email address first.'); return; }
+    this.loading.set(true);
+    this.auth.resendVerification(this.email).subscribe({
+      next: () => { this.message.set('If this account is awaiting verification, a new email has been sent.'); this.loading.set(false); },
+      error: response => { this.error.set(this.getErrorMessage(response)); this.loading.set(false); }
+    });
   }
 
 

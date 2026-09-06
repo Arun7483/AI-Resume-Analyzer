@@ -1,112 +1,27 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { BriefcaseBusiness, ExternalLink, LoaderCircle, MapPin, RefreshCw, Sparkles, LucideAngularModule } from 'lucide-angular';
 import { JobsService } from '../../services/jobs.service';
 
 @Component({
-  selector: 'app-job-matches',
-  standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  selector: 'app-job-matches', standalone: true, imports: [CommonModule, LucideAngularModule],
   template: `
     <section aria-labelledby="jobs-title">
-      <div class="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-[.18em] text-brand-600">Live opportunities</p>
-          <h2 id="jobs-title" class="mt-1 text-3xl font-bold text-slate-950">Jobs matched to your resume</h2>
-          <p class="mt-2 max-w-2xl text-sm text-slate-500">Fresh listings ranked by the skills and experience in your latest uploaded resume.</p>
-          @if (jobs.jobs().length) { <p class="mt-3 text-xs font-bold text-slate-400">{{ jobs.jobs().length }} opportunities found · showing {{ visibleJobs().length }}</p> }
-          @if (isSearchFallback()) { <p class="mt-3 max-w-2xl rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Live job feeds are unavailable. These are resume-matched search links, not individual job records. Refresh after the backend feed is available.</p> }
-        </div>
-        <button type="button" class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm" (click)="refresh()" [disabled]="jobs.loading()">
-          <lucide-icon [img]="RefreshCw" [size]="15" [class.animate-spin]="jobs.loading()" /> Refresh
-        </button>
-      </div>
-
-      @if (jobs.loading()) {
-        <div class="mt-8 grid place-items-center rounded-2xl border border-slate-200 bg-white py-16 text-sm text-slate-500">
-          <lucide-icon [img]="LoaderCircle" [size]="24" class="mb-3 animate-spin text-brand-500" />
-          Finding active roles for your profile...
-        </div>
-      } @else if (jobs.error() && !jobs.jobs().length) {
-        <div class="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">{{ jobs.error() }}</div>
-      } @else if (!jobs.jobs().length) {
-        <div class="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-          <lucide-icon [img]="BriefcaseBusiness" [size]="30" class="mx-auto text-brand-500" />
-          <h3 class="mt-3 font-bold text-slate-900">No active listings are available right now</h3>
-          <p class="mt-1 text-sm text-slate-500">Refresh in a moment, or upload a resume and try again after analysis finishes.</p>
-        </div>
-      } @else {
-        <div class="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
-          <p class="text-xs font-semibold text-slate-500">Sort resume matches</p>
-          <select class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700" [value]="sortMode()" (change)="setSortMode($any($event.target).value)">
-            <option value="match">Best resume match</option><option value="title">Job title A-Z</option>
-          </select>
-        </div>
-        <div class="mt-4 grid gap-4 lg:grid-cols-2">
-          @for (job of visibleJobs(); track job.applyUrl) {
-            <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-              <div class="flex items-start justify-between gap-4">
-                <div>
-                  <h3 class="font-bold leading-snug text-slate-950">{{ job.title }}</h3>
-                  <p class="mt-1 text-sm font-semibold text-brand-700">{{ job.company }}</p>
-                </div>
-                <span class="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">{{ job.matchPercentage }}% match</span>
-              </div>
-              <div class="mt-3 flex flex-wrap gap-3 text-xs font-semibold text-slate-500">
-                <span class="flex items-center gap-1"><lucide-icon [img]="MapPin" [size]="14" />{{ job.location || 'Location not listed' }}</span>
-                @if (job.remote) { <span class="rounded-full bg-sky-50 px-2 py-1 text-sky-700">Remote</span> }
-              </div>
-              <p class="mt-4 line-clamp-3 text-sm leading-relaxed text-slate-600">{{ job.description }}</p>
-              <a class="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white" [href]="job.applyUrl" target="_blank" rel="noopener noreferrer">
-                Apply now <lucide-icon [img]="ExternalLink" [size]="15" />
-              </a>
-            </article>
-          }
-        </div>
-        @if (visibleJobs().length < jobs.jobs().length) {
-          <button type="button" class="mx-auto mt-6 flex items-center gap-2 rounded-xl border border-brand-200 bg-white px-4 py-2.5 text-sm font-bold text-brand-700 shadow-sm hover:bg-brand-50" (click)="showMore()">
-            Show more opportunities <span class="text-xs text-slate-400">({{ jobs.jobs().length - visibleJobs().length }} remaining)</span>
-          </button>
-        }
-        <p class="mt-5 flex items-center gap-2 text-xs text-slate-400"><lucide-icon [img]="Sparkles" [size]="14" />Real listings are ranked from public feeds. Search-link results open the original job platform.</p>
-      }
-    </section>
-  `
+      <div class="flex flex-wrap items-end justify-between gap-4"><div>
+        <p class="text-xs font-bold uppercase tracking-[.18em] text-brand-600">Live opportunities</p>
+        <h2 id="jobs-title" class="mt-1 text-3xl font-bold text-slate-950">Jobs matched to your resume</h2>
+        <p class="mt-2 max-w-2xl text-sm text-slate-500">Individual Adzuna listings ranked against your latest resume.</p>
+        @if (jobs.jobs().length) { <p class="mt-3 text-xs font-bold text-slate-400">{{ jobs.total() }} unique live opportunities found · showing {{ jobs.jobs().length }}</p> }
+      </div><button type="button" class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm" (click)="refresh()" [disabled]="jobs.loading()"><lucide-icon [img]="RefreshCw" [size]="15" [class.animate-spin]="jobs.loading()" /> Refresh</button></div>
+      @if (jobs.loading() && !jobs.jobs().length) { <div class="mt-8 grid place-items-center rounded-2xl border border-slate-200 bg-white py-16 text-sm text-slate-500"><lucide-icon [img]="LoaderCircle" [size]="24" class="mb-3 animate-spin text-brand-500" />Finding active roles for your profile...</div>
+      } @else if (jobs.error() && !jobs.jobs().length) { <div class="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">{{ jobs.error() }}</div>
+      } @else if (!jobs.jobs().length) { <div class="mt-8 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center"><lucide-icon [img]="BriefcaseBusiness" [size]="30" class="mx-auto text-brand-500" /><h3 class="mt-3 font-bold text-slate-900">No individual listings are available right now</h3><p class="mt-1 text-sm text-slate-500">Refresh later; ResumePulse never substitutes search links for listings.</p></div>
+      } @else { <div class="mt-4 grid gap-4 lg:grid-cols-2">@for (job of jobs.jobs(); track job.jobId || job.applyUrl) { <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div class="flex items-start justify-between gap-4"><div><h3 class="font-bold leading-snug text-slate-950">{{ job.title }}</h3><p class="mt-1 text-sm font-semibold text-brand-700">{{ job.company }}</p></div><span class="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">{{ job.matchPercentage }}% match</span></div><div class="mt-3 flex flex-wrap gap-3 text-xs font-semibold text-slate-500"><span class="flex items-center gap-1"><lucide-icon [img]="MapPin" [size]="14" />{{ job.location || 'Location not listed' }}</span>@if(job.remote){<span class="rounded-full bg-sky-50 px-2 py-1 text-sky-700">Remote</span>} @if(job.employmentType){<span>{{ job.employmentType }}</span>} @if(job.postedAt){<span>Posted {{ job.postedAt | date:'mediumDate' }}</span>}</div><p class="mt-4 line-clamp-3 text-sm leading-relaxed text-slate-600">{{ job.description }}</p>@if(job.matchedSkills.length){<p class="mt-3 text-xs text-emerald-700"><strong>Matched:</strong> {{ job.matchedSkills.join(', ') }}</p>} @if(job.missingSkills.length){<p class="mt-1 text-xs text-amber-700"><strong>Missing:</strong> {{ job.missingSkills.join(', ') }}</p>}<a class="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-bold text-white" [href]="job.applyUrl" target="_blank" rel="noopener noreferrer">Apply <lucide-icon [img]="ExternalLink" [size]="15" /></a></article> }</div>@if(jobs.hasMore()){<button type="button" class="mx-auto mt-6 flex items-center gap-2 rounded-xl border border-brand-200 bg-white px-4 py-2.5 text-sm font-bold text-brand-700" (click)="loadMore()" [disabled]="jobs.loading()">Load more opportunities</button>}<a class="mt-5 inline-flex min-h-[23px] min-w-[116px] items-center gap-2 text-xs font-semibold text-slate-500 underline" href="https://www.adzuna.in/" target="_blank" rel="noopener noreferrer" aria-label="Jobs by Adzuna">Jobs by Adzuna <lucide-icon [img]="Sparkles" [size]="14" /></a> }
+    </section>`
 })
 export class JobMatchesComponent {
-  readonly jobs = inject(JobsService);
-  readonly BriefcaseBusiness = BriefcaseBusiness;
-  readonly ExternalLink = ExternalLink;
-  readonly LoaderCircle = LoaderCircle;
-  readonly MapPin = MapPin;
-  readonly RefreshCw = RefreshCw;
-  readonly Sparkles = Sparkles;
-  readonly visibleCount = signal(24);
-  readonly sortMode = signal<'match' | 'title'>('match');
-  readonly sortedJobs = computed(() => {
-    const jobs = [...this.jobs.jobs()];
-    if (this.sortMode() === 'title') jobs.sort((left, right) => left.title.localeCompare(right.title));
-    if (this.sortMode() === 'match') jobs.sort((left, right) => right.matchPercentage - left.matchPercentage);
-    return jobs;
-  });
-  readonly visibleJobs = computed(() => this.sortedJobs().slice(0, this.visibleCount()));
-  readonly isSearchFallback = computed(() => this.jobs.jobs().length > 0 && this.jobs.jobs().every(job => job.company.includes('active job search')));
-
-  ngOnInit(): void {
-    this.jobs.loadMatches();
-  }
-
-  refresh(): void {
-    this.visibleCount.set(24);
-    this.jobs.loadMatches();
-  }
-
-  showMore(): void {
-    this.visibleCount.update(value => value + 24);
-  }
-
-  setSortMode(mode: 'match' | 'title'): void {
-    this.sortMode.set(mode);
-    this.visibleCount.set(24);
-  }
+  readonly jobs = inject(JobsService); readonly BriefcaseBusiness = BriefcaseBusiness; readonly ExternalLink = ExternalLink; readonly LoaderCircle = LoaderCircle; readonly MapPin = MapPin; readonly RefreshCw = RefreshCw; readonly Sparkles = Sparkles;
+  ngOnInit(): void { this.jobs.loadMatches(); }
+  refresh(): void { this.jobs.loadMatches(); }
+  loadMore(): void { this.jobs.loadMatches(Math.floor(this.jobs.jobs().length / 24), true); }
 }

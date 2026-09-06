@@ -9,6 +9,8 @@ export DATABASE_URL='jdbc:postgresql://localhost:5432/resume_analyzer'
 export DB_USERNAME='avnadmin'
 export DB_PASSWORD='change-me'
 export JWT_SECRET="$(openssl rand -base64 64)"
+export ADZUNA_APP_ID='...'
+export ADZUNA_APP_KEY='...'
 export RESUME_STORAGE_PATH='/var/lib/resume-analyzer/uploads'
 export GROQ_API_KEY='...'
 export GROQ_MODEL='llama-3.3-70b-versatile'
@@ -41,7 +43,8 @@ BACKEND_URL=http://localhost:8080
 FRONTEND_URL=http://localhost:4200
 GROQ_API_KEY=YOUR_GROQ_KEY
 GROQ_MODEL=llama-3.3-70b-versatile
-JSEARCH_API_KEY=YOUR_RAPIDAPI_JSEARCH_KEY
+ADZUNA_APP_ID=YOUR_ADZUNA_APP_ID
+ADZUNA_APP_KEY=YOUR_ADZUNA_APP_KEY
 ```
 
 For the hosted Aiven database, replace only the database values with:
@@ -70,7 +73,7 @@ The local JWT fallback is only for development. Never use it in Render; keep a s
 
 ### Live job listings
 
-The public feeds are best-effort and may return fewer than 1,000 records or be blocked by a hosting provider. For a large set of real listings, create a RapidAPI JSearch subscription and add `JSEARCH_API_KEY` to the IntelliJ or Render environment. The backend queries multiple resume-derived role searches, deduplicates application URLs, and ranks the combined results against the uploaded resume. Groq is used for resume analysis/chat; it is not a live job database.
+Adzuna is the sole live-job provider. Set `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` in the IntelliJ or Render environment; never commit them. The backend aggregates a bounded number of resume-derived Adzuna searches, deduplicates actual listings, and ranks the combined results. Groq is used for resume analysis/chat and profile enrichment; it is not a live job database.
 
 For the Aiven database, configure these three Render variables. Convert its Service URI from `postgres://` to a JDBC URL without credentials and keep the SSL query parameter:
 
@@ -82,7 +85,7 @@ DB_PASSWORD=YOUR_AIVEN_PASSWORD
 
 Enter the actual values in Render. Do not enter `${DATABASE_USERNAME}`, `${DATABASE_PASSWORD}`, or the literal `CLICK_TO:REVEAL_PASSWORD`.
 
-Normal email/password signup is enabled and signs users in immediately; it does not require email verification. Google sign-in also creates verified accounts. The verification endpoints remain available for existing accounts and backwards compatibility.
+Normal email/password signup creates an unverified account, sends a 24-hour verification link, and does not issue a JWT until verification is complete. Google sign-in is verified by Google and creates a verified account.
 
 ## Email verification (local Gmail setup)
 
@@ -101,7 +104,7 @@ Create the app password in the Google Account security settings after enabling 2
 - `POST /api/v1/auth/register` — email, password, and fullName
 - `POST /api/v1/auth/login` — email and password
 - `POST /api/v1/resumes/upload` — multipart `file` and optional `jobDescription`
-- `GET /api/v1/resumes/job-matches` — active job listings ranked against the latest uploaded resume
+- `GET /api/v1/resumes/job-matches?page=0&size=24` — paged, deduplicated individual Adzuna listings ranked against the latest uploaded resume
 - `POST /api/v1/chat` — prompt and optional resumeId
 
 All resume, job-match, and chat endpoints require `Authorization: Bearer <token>`. Ownership is derived from the authenticated principal rather than request-provided user IDs. Job applications open on the original listing site through each returned `applyUrl`.

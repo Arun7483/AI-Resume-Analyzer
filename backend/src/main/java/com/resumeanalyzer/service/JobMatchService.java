@@ -1,313 +1,142 @@
 package com.resumeanalyzer.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.resumeanalyzer.dto.JobMatchDto;
+import com.resumeanalyzer.dto.JobMatchPageDto;
 import com.resumeanalyzer.entity.Resume;
+import com.resumeanalyzer.exception.BadRequestException;
+import com.resumeanalyzer.exception.JobFeedUnavailableException;
 import com.resumeanalyzer.repository.ResumeRepository;
 import com.resumeanalyzer.security.CurrentUser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
-import org.springframework.beans.factory.annotation.Value;
 
-@Service
-@RequiredArgsConstructor
-@Slf4j
+/** Retrieves and ranks only individual listings supplied by Adzuna. */
+@Service @RequiredArgsConstructor @Slf4j
 public class JobMatchService {
-
-    private static final Pattern WORDS = Pattern.compile("[a-zA-Z][a-zA-Z+#.-]{3,}");
-    private static final Set<String> STOP_WORDS = Set.of(
-            "with", "this", "that", "from", "your", "have", "will", "into", "using",
-            "work", "years", "team", "role", "about", "more", "than", "they", "their",
-            "and", "the", "for", "you", "are", "was", "were", "not", "our", "all"
-    );
-
+    private static final Pattern WORD = Pattern.compile("[a-zA-Z][a-zA-Z+#.-]{1,}");
+    private static final Set<String> STOP = Set.of("and","the","for","with","from","this","that","your","work","years","team","will","have","using","experience","engineer");
+    private static final long CACHE_TTL_MS = 300_000L;
     private final ResumeRepository resumes;
     private final CurrentUser currentUser;
-    private final RestClient jobsClient = RestClient.builder()
-            .baseUrl("https://www.arbeitnow.com/api/job-board-api")
-            .build();
+    private final ChatClient.Builder chatClientBuilder;
+    private final Map<Long, CachedMatches> cache = new HashMap<>();
+    @Value("${app.jobs.adzuna-app-id:}") private String adzunaAppId;
+    @Value("${app.jobs.adzuna-app-key:}") private String adzunaAppKey;
+    @Value("${app.jobs.adzuna-country:in}") private String adzunaCountry;
+    @Value("${app.jobs.adzuna-max-pages-per-query:3}") private int maxPagesPerQuery;
+    @Value("${app.jobs.adzuna-max-roles-per-query:6}") private int maxRolesPerQuery;
+    @Value("${spring.ai.openai.api-key:}") private String groqApiKey;
 
-        @Value("${app.jobs.feed-url:https://www.arbeitnow.com/api/job-board-api}")
-        private String jobsFeedUrl;
-
-    public List<JobMatchDto> findMatches() {
-        Resume resume = resumes.findTopByUserIdOrderByUploadedAtDesc(currentUser.require().getId())
-                .orElse(null);
-        String resumeText = resume == null || resume.getRawText() == null ? "" : resume.getRawText();
-        Set<String> resumeWords = words(resumeText);
-
-        List<JobMatchDto> matches = new ArrayList<>();
-        Set<String> seenUrls = new HashSet<>();
-        collectJSearch(matches, seenUrls, resumeWords, detectRoles(resumeText.toLowerCase(Locale.ROOT)));
-        collectArbeitnow(matches, seenUrls, resumeWords);
-        collectRemoteOk(matches, seenUrls, resumeWords);
-        collectRemotive(matches, seenUrls, resumeWords);
-        List<JobMatchDto> ranked = matches.stream()
-            .sorted(Comparator.comparingInt(JobMatchDto::matchPercentage).reversed())
-            .limit(1200)
-            .toList();
-        return ranked.isEmpty() ? fallbackJobs(resumeText) : ranked;
+    public synchronized JobMatchPageDto findMatches(int page, int size) {
+        if (page < 0 || size < 1 || size > 100) throw new BadRequestException("page must be zero or greater and size must be between 1 and 100");
+        Resume resume = resumes.findTopByUserIdOrderByUploadedAtDesc(currentUser.require().getId()).orElseThrow(() -> new BadRequestException("Upload a resume before requesting job matches"));
+        CachedMatches cached = cache.get(resume.getId());
+        if (cached == null || cached.createdAt + CACHE_TTL_MS < System.currentTimeMillis()) {
+            cached = new CachedMatches(loadMatches(resume), System.currentTimeMillis()); cache.put(resume.getId(), cached);
         }
-
-    @Value("${app.jobs.jsearch-api-key:}")
-    private String jsearchApiKey;
-
-    private void collectJSearch(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords, List<String> roles) {
-        if (jsearchApiKey == null || jsearchApiKey.isBlank()) return;
-        try {
-            RestClient client = RestClient.builder()
-                    .baseUrl("https://jsearch.p.rapidapi.com")
-                    .defaultHeader("X-RapidAPI-Key", jsearchApiKey)
-                    .defaultHeader("X-RapidAPI-Host", "jsearch.p.rapidapi.com")
-                    .build();
-            for (String role : roles.stream().limit(8).toList()) {
-                JsonNode root = client.get().uri(uriBuilder -> uriBuilder.path("/search")
-                        .queryParam("query", role)
-                        .queryParam("page", 1)
-                        .queryParam("num_pages", 20)
-                        .build()).retrieve().body(JsonNode.class);
-                if (root == null || !root.path("data").isArray()) continue;
-                for (JsonNode job : root.path("data")) {
-                    String url = text(job, "job_apply_link");
-                    String title = text(job, "job_title");
-                    if (title.isBlank() || url.isBlank() || !seenUrls.add(url)) continue;
-                    String location = text(job, "job_city") + ", " + text(job, "job_country");
-                    matches.add(toMatch(title, text(job, "employer_name"), location,
-                            text(job, "job_description"), url, job.path("job_is_remote").asBoolean(false), resumeWords));
-                }
-            }
-        } catch (RuntimeException exception) {
-            log.warn("JSearch provider unavailable: {}", exception.getMessage());
-        }
+        int from = Math.min(page * size, cached.matches.size()), to = Math.min(from + size, cached.matches.size());
+        return new JobMatchPageDto(cached.matches.subList(from, to), page, size, cached.matches.size(), to < cached.matches.size());
     }
 
-        private void collectArbeitnow(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords) {
-        Set<String> seenPages = new HashSet<>();
-        for (int page = 1; page <= 100 && matches.size() < 1200; page++) {
-            try {
-                String separator = jobsFeedUrl.contains("?") ? "&" : "?";
-                    JsonNode root = RestClient.builder().build().get()
-                        .uri(page == 1 ? jobsFeedUrl : jobsFeedUrl + separator + "page=" + page)
+    private List<JobMatchDto> loadMatches(Resume resume) {
+        if (adzunaAppId == null || adzunaAppId.isBlank() || adzunaAppKey == null || adzunaAppKey.isBlank()) throw new JobFeedUnavailableException("Live job feed is not configured. Set ADZUNA_APP_ID and ADZUNA_APP_KEY and try again.");
+        CandidateProfile profile = enrichWithGroq(resume.getRawText(), CandidateProfile.from(resume.getRawText()));
+        if (profile.roles.isEmpty()) throw new BadRequestException("We could not identify a job domain from this resume yet");
+        RestClient client = RestClient.builder().baseUrl("https://api.adzuna.com/v1/api").defaultHeader("Accept", "application/json").build();
+        Map<String, JobMatchDto> unique = new LinkedHashMap<>(); boolean responded = false;
+        try {
+            for (String role : profile.roles.stream().limit(Math.max(1, maxRolesPerQuery)).toList()) for (int providerPage = 1; providerPage <= Math.max(1, maxPagesPerQuery); providerPage++) {
+                JsonNode root = client.get().uri(b -> b.path("/jobs/{country}/search/{page}")
+                                .queryParam("app_id", adzunaAppId).queryParam("app_key", adzunaAppKey).queryParam("what", role)
+                                .queryParam("results_per_page", 20).queryParam("content-type", "application/json").build(adzunaCountry, providerPage))
                         .retrieve().body(JsonNode.class);
-                    if (root == null || !root.path("data").isArray() || root.path("data").isEmpty()) {
-                        break;
-                    }
-                    String pageSignature = root.path("data").get(0).path("url").asText("") + ":" + root.path("data").size();
-                    if (!seenPages.add(pageSignature)) {
-                        break;
-                    }
-                    for (JsonNode job : root.path("data")) {
-                        addArbeitnowJob(matches, seenUrls, resumeWords, job);
-                    }
-                } catch (RuntimeException exception) {
-                    log.warn("Arbeitnow jobs feed failed on page {} using {}: {}", page, jobsFeedUrl, exception.getMessage());
-                if (page == 1) {
-                    return;
-                }
-                break;
+                responded = true; JsonNode data = root == null ? null : root.path("results");
+                if (data == null || !data.isArray() || data.isEmpty()) break;
+                for (JsonNode job : data) addAdzunaJob(unique, job, profile);
             }
-            }
+        } catch (RestClientException | IllegalStateException exception) {
+            log.warn("Adzuna request failed for country {}: {}", adzunaCountry, exception.getMessage());
+            throw new JobFeedUnavailableException("The live Adzuna feed is temporarily unavailable. Please try again later.");
         }
-
-        private void addArbeitnowJob(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords, JsonNode job) {
-            try {
-                String title = text(job, "title");
-                String company = text(job, "company_name");
-                String location = text(job, "location");
-                String description = text(job, "description");
-                String applyUrl = text(job, "url");
-                if (title.isBlank() || applyUrl.isBlank() || !seenUrls.add(applyUrl)) {
-                    return;
-            }
-                matches.add(toMatch(title, company, location, description, applyUrl, job.path("remote").asBoolean(false), resumeWords));
-            } catch (RuntimeException ignored) {
-                // Skip malformed third-party listings and keep the other jobs usable.
-        }
+        if (!responded) throw new JobFeedUnavailableException("The live Adzuna feed returned no response. Please try again later.");
+        return unique.values().stream().distinct().sorted(Comparator.comparingInt(JobMatchDto::matchPercentage).reversed()).toList();
     }
 
-    private void collectRemoteOk(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords) {
+    private void addAdzunaJob(Map<String, JobMatchDto> unique, JsonNode job, CandidateProfile profile) {
+        String title = text(job,"title"), applyUrl = text(job,"redirect_url"), jobId = text(job,"id");
+        if (title.isBlank() || applyUrl.isBlank()) return;
+        String company = text(job.path("company"),"display_name"), location = text(job.path("location"),"display_name");
+        String key = !jobId.isBlank() ? "id:" + jobId : "url:" + normalUrl(applyUrl), fallback = "fallback:" + normal(title) + "|" + normal(company) + "|" + normal(location);
+        if (unique.containsKey(key) || unique.containsKey("url:" + normalUrl(applyUrl)) || unique.containsKey(fallback)) return;
+        String description = clean(text(job,"description")); MatchDetails match = score(profile, title, description, location, false);
+        JobMatchDto listing = new JobMatchDto(jobId,title,company,location,adzunaCountry.toUpperCase(Locale.ROOT),description,applyUrl,"Adzuna",text(job.path("category"),"label"),text(job,"created"),contract(job),number(job,"salary_min"),number(job,"salary_max"),"",false,match.score,match.matched,match.missing);
+        unique.put(key, listing); unique.put("url:" + normalUrl(applyUrl), listing); unique.put(fallback, listing);
+    }
+
+    private MatchDetails score(CandidateProfile profile, String title, String description, String location, boolean remote) {
+        Set<String> jobWords = words(title + " " + description); long matched = profile.skills.stream().filter(jobWords::contains).count();
+        List<String> present = profile.skills.stream().filter(jobWords::contains).limit(12).toList(), missing = profile.skills.stream().filter(s -> !jobWords.contains(s)).limit(12).toList();
+        boolean role = profile.roles.stream().anyMatch(r -> normal(title).contains(normal(r)) || overlap(words(r), words(title)) >= 1);
+        boolean domain = profile.domain.stream().anyMatch(term -> jobWords.contains(term) || normal(title).contains(term));
+        int roleScore = role ? 35 : domain ? 22 : 0, skillScore = profile.skills.isEmpty() ? 0 : (int)Math.round(30d * matched / profile.skills.size());
+        int seniority = seniorityCompatible(profile.seniority, title + " " + description) ? 15 : 5;
+        int locationScore = remote || (!profile.location.isBlank() && normal(location).contains(normal(profile.location))) ? 5 : 0;
+        int educationScore = !profile.education.isBlank() && normal(description).contains(normal(profile.education)) ? 5 : 0;
+        return new MatchDetails(Math.max(0,Math.min(100,roleScore + skillScore + seniority + educationScore + (domain ? 10 : 0) + locationScore)),present,missing);
+    }
+    private boolean seniorityCompatible(String seniority, String value) { value=value.toLowerCase(Locale.ROOT); return !"entry".equals(seniority) || !(value.contains("senior")||value.contains("lead")||value.contains("principal")); }
+    private int overlap(Set<String> left, Set<String> right) { return (int)left.stream().filter(right::contains).count(); }
+    private Set<String> words(String value) { Set<String> r=new LinkedHashSet<>(); var m=WORD.matcher(value.toLowerCase(Locale.ROOT)); while(m.find()) if(!STOP.contains(m.group())) r.add(m.group()); return r; }
+    private String text(JsonNode node,String field) { return node.path(field).asText("").trim(); }
+    private Double number(JsonNode node,String field) { return node.hasNonNull(field)&&node.path(field).isNumber()?node.path(field).asDouble():null; }
+    private String clean(String value) { return value.replaceAll("<[^>]+>"," ").replaceAll("\\s+"," ").trim(); }
+    private String join(String... values) { return Arrays.stream(values).filter(v->!v.isBlank()).distinct().reduce((a,b)->a+", "+b).orElse(""); }
+    private String normal(String value) { return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+"," ").trim(); }
+    private String normalUrl(String value) { return value.trim().replaceAll("[?#].*$", "").replaceAll("/$", "").toLowerCase(Locale.ROOT); }
+    private String contract(JsonNode job) { return join(text(job, "contract_type"), text(job, "contract_time")); }
+    private CandidateProfile enrichWithGroq(String resume, CandidateProfile fallback) {
+        if (groqApiKey == null || groqApiKey.isBlank()) return fallback;
         try {
-            JsonNode root = RestClient.builder().build().get().uri("https://remoteok.com/api")
-                    .header("User-Agent", "ResumePulse/1.0").retrieve().body(JsonNode.class);
-            if (root == null || !root.isArray()) return;
-            for (JsonNode job : root) {
-                String url = text(job, "url");
-                if (url.isBlank()) url = "https://remoteok.com/remote-jobs/" + text(job, "slug");
-                if (text(job, "position").isBlank() || !seenUrls.add(url)) continue;
-                matches.add(toMatch(text(job, "position"), text(job, "company"), text(job, "location"), text(job, "description"), url, true, resumeWords));
-            }
-        } catch (RestClientException ignored) {
-            log.warn("Remote OK jobs feed unavailable: {}", ignored.getMessage());
-            // Arbeitnow and the resume-based fallback remain available when this feed is unavailable.
-        }
+            AiProfile ai = chatClientBuilder.build().prompt().system("Extract a factual candidate profile. Return only structured data; do not infer unrelated career domains.")
+                    .user("Extract domain, roles, skills, seniority and location from this resume. Hardware/VLSI/FPGA/embedded candidates must retain those specialisms.\n\n" + resume).call().entity(AiProfile.class);
+            if (ai == null || ai.roles == null || ai.roles.isEmpty()) return fallback;
+            LinkedHashSet<String> roles = new LinkedHashSet<>(ai.roles); LinkedHashSet<String> skills = new LinkedHashSet<>(fallback.skills); if (ai.skills != null) ai.skills.stream().filter(Objects::nonNull).map(s -> s.toLowerCase(Locale.ROOT).trim()).filter(s -> !s.isBlank()).forEach(skills::add);
+            LinkedHashSet<String> domain = new LinkedHashSet<>(fallback.domain); if (ai.domain != null && !ai.domain.isBlank()) domain.addAll(words(ai.domain));
+            return new CandidateProfile(List.copyOf(roles), Set.copyOf(skills), Set.copyOf(domain), ai.seniority == null || ai.seniority.isBlank() ? fallback.seniority : ai.seniority.toLowerCase(Locale.ROOT), ai.location == null ? fallback.location : ai.location, fallback.education);
+        } catch (RuntimeException exception) { log.info("Groq candidate-profile extraction unavailable; using deterministic profile: {}", exception.getMessage()); return fallback; }
     }
-
-    private void collectRemotive(List<JobMatchDto> matches, Set<String> seenUrls, Set<String> resumeWords) {
-        try {
-            JsonNode root = RestClient.builder().build().get().uri("https://remotive.com/api/remote-jobs?limit=100")
-                    .retrieve().body(JsonNode.class);
-            if (root == null || !root.path("jobs").isArray()) return;
-            for (JsonNode job : root.path("jobs")) {
-                String url = text(job, "url");
-                if (text(job, "title").isBlank() || url.isBlank() || !seenUrls.add(url)) continue;
-                matches.add(toMatch(text(job, "title"), text(job, "company_name"), text(job, "candidate_required_location"), text(job, "description"), url, true, resumeWords));
-            }
-        } catch (RestClientException ignored) {
-            log.warn("Remotive jobs feed unavailable: {}", ignored.getMessage());
-            // Keep the primary feed results when this feed is unavailable.
+    private record CachedMatches(List<JobMatchDto> matches,long createdAt) {}
+    private record MatchDetails(int score,List<String> matched,List<String> missing) {}
+    private record AiProfile(String domain,List<String> roles,List<String> skills,String seniority,String location) {}
+    private record CandidateProfile(List<String> roles,Set<String> skills,Set<String> domain,String seniority,String location,String education) {
+        static CandidateProfile from(String raw) {
+            String text=Objects.requireNonNullElse(raw,"").toLowerCase(Locale.ROOT); LinkedHashSet<String> roles=new LinkedHashSet<>(), skills=new LinkedHashSet<>(), domain=new LinkedHashSet<>();
+            add(text,roles,skills,domain,List.of("vlsi","asic","semiconductor","verilog","systemverilog","rtl","physical design","sta","dft","cadence"),List.of("VLSI Design Engineer","ASIC Design Engineer","RTL Design Engineer","Design Verification Engineer","Physical Design Engineer","DFT Engineer","STA Engineer","SoC Verification Engineer","Silicon Validation Engineer"));
+            add(text,roles,skills,domain,List.of("fpga","vhdl","digital logic"),List.of("FPGA Engineer","FPGA Design Engineer","FPGA Verification Engineer","RTL Engineer"));
+            add(text,roles,skills,domain,List.of("embedded","firmware","microcontroller","embedded linux","arduino","raspberry pi","iot"),List.of("Embedded Systems Engineer","Embedded Firmware Engineer","Firmware Engineer","Embedded Linux Engineer","IoT Engineer","Microcontroller Engineer"));
+            add(text,roles,skills,domain,List.of("electronics","pcb","circuit","board design","analog","instrumentation","altium","ltspice"),List.of("Electronics Engineer","Hardware Design Engineer","PCB Design Engineer","Circuit Design Engineer","Hardware Verification Engineer","Electronics Test Engineer"));
+            add(text,roles,skills,domain,List.of("automotive","adas","battery management","electric vehicle","ev "),List.of("Automotive Embedded Engineer","Automotive Electronics Engineer","EV Engineer","Battery Management Engineer","ADAS Engineer"));
+            add(text,roles,skills,domain,List.of("data analyst","data science","machine learning","tableau","power bi","pandas","tensorflow"),List.of("Data Analyst","Data Scientist","Data Engineer","Business Intelligence Analyst","Machine Learning Engineer"));
+            add(text,roles,skills,domain,List.of("cybersecurity","information security","soc analyst","penetration testing","siem","vulnerability","incident response"),List.of("Cybersecurity Analyst","SOC Analyst","Security Engineer","Penetration Tester","Cloud Security Engineer"));
+            add(text,roles,skills,domain,List.of("mechanical engineer","solidworks","manufacturing","production engineer","thermodynamics","hvac"),List.of("Mechanical Engineer","Mechanical Design Engineer","Manufacturing Engineer","Production Engineer","CAD Engineer"));
+            add(text,roles,skills,domain,List.of("civil engineer","structural","construction","quantity survey","geotechnical","site engineer","revit"),List.of("Civil Engineer","Structural Engineer","Construction Engineer","Site Engineer","Project Engineer"));
+            add(text,roles,skills,domain,List.of("figma","user experience","ux","ui design","prototype","wireframe"),List.of("UX Designer","UI Designer","Product Designer","UX Researcher"));
+            add(text,roles,skills,domain,List.of("product manager","roadmap","agile","scrum","product owner"),List.of("Product Manager","Product Owner","Program Manager"));
+            if(roles.isEmpty()&&has(text,"java","spring boot","angular","react","typescript","python")) roles.addAll(List.of("Software Engineer","Backend Developer","Frontend Developer"));
+            for(String s:List.of("verilog","systemverilog","vhdl","cmos","cadence","fpga","rtl","embedded c","c++","pcb","altium","ltspice","linux","python","java","spring boot","angular","typescript")) if(text.contains(s)) skills.add(s);
+            String education = has(text,"b.tech","btech","bachelor of technology") ? "bachelor" : has(text,"m.tech","master") ? "master" : "";
+            return new CandidateProfile(List.copyOf(roles),Set.copyOf(skills),Set.copyOf(domain),has(text,"fresher","intern","student","graduate","entry level")?"entry":has(text,"senior","lead","6 years","7 years")?"senior":"mid","",education);
         }
-    }
-
-    private JobMatchDto toMatch(String title, String company, String location, String description, String url, boolean remote, Set<String> resumeWords) {
-        Set<String> jobWords = words(title + " " + description);
-        long overlap = jobWords.stream().filter(resumeWords::contains).count();
-        int score = Math.min(98, Math.max(25, 25 + (int) Math.round(73.0 * overlap / Math.max(1, Math.min(12, jobWords.size())))));
-        return new JobMatchDto(title, company, location, clean(description), url, score, remote);
-    }
-
-    public List<JobMatchDto> fallbackMatches() {
-        try {
-            Resume resume = resumes.findTopByUserIdOrderByUploadedAtDesc(currentUser.require().getId()).orElse(null);
-            return fallbackJobs(resume == null || resume.getRawText() == null ? "" : resume.getRawText());
-        } catch (RuntimeException exception) {
-            return fallbackJobs("");
-        }
-    }
-
-    private List<JobMatchDto> fallbackJobs(String resumeText) {
-        String normalized = resumeText.toLowerCase(Locale.ROOT);
-        List<String> roles = detectRoles(normalized);
-        List<String> seniority = detectSeniority(normalized);
-        List<JobMatchDto> jobs = new ArrayList<>();
-        int roleIndex = 0;
-
-        for (String role : roles) {
-            for (String level : seniority) {
-                String title = level + " " + role;
-                String query = java.net.URLEncoder.encode(title, java.nio.charset.StandardCharsets.UTF_8);
-                Map<String, String> portals = Map.of(
-                        "LinkedIn", "https://www.linkedin.com/jobs/search/?keywords=" + query,
-                        "Naukri", "https://www.naukri.com/" + title.toLowerCase(Locale.ROOT).replace(' ', '-') + "-jobs",
-                        "Foundit", "https://www.foundit.in/srp/results?query=" + query,
-                    "Internshala", "https://internshala.com/jobs/keywords-" + title.toLowerCase(Locale.ROOT).replace(' ', '-') + "/",
-                    "Unstop", "https://unstop.com/jobs?search=" + query
-                );
-                for (Map.Entry<String, String> portal : portals.entrySet()) {
-                    jobs.add(fallback(title, portal.getKey() + " active job search", "Current listings", portal.getValue(), 72 - Math.min(20, roleIndex * 4)));
-                }
-                roleIndex++;
-            }
-        }
-        return jobs;
-    }
-
-    private List<String> detectRoles(String resumeText) {
-        LinkedHashSet<String> roles = new LinkedHashSet<>();
-        boolean hardwareProfile = containsAny(resumeText, "electronics", "electronic", "embedded", "microcontroller", "micro controller", "pcb", "fpga", "verilog", "vhdl", "vlsi", "circuit", "firmware", "arduino", "raspberry pi", "instrumentation", "altium", "proteus", "ltspice", "cadence", "hardware", "iot");
-        if (hardwareProfile) {
-            roles.addAll(List.of("Electronics Engineer", "Embedded Systems Engineer", "Hardware Design Engineer", "PCB Design Engineer", "Firmware Engineer", "FPGA Engineer"));
-        }
-        if (!hardwareProfile && containsAny(resumeText, "java", "spring boot", "python", "javascript", "typescript", "react", "angular", "node.js", "software engineer", "software developer", "rest api", "docker", "kubernetes")) {
-            roles.addAll(List.of("Software Engineer", "Backend Developer", "Frontend Developer", "Full Stack Developer", "DevOps Engineer"));
-        }
-        if (containsAny(resumeText, "data analyst", "sql", "tableau", "power bi", "statistics", "analytics", "machine learning", "data science", "pandas", "tensorflow")) {
-            roles.addAll(List.of("Data Analyst", "Data Scientist", "Data Engineer", "Business Intelligence Analyst", "Machine Learning Engineer"));
-        }
-        if (containsAny(resumeText, "cybersecurity", "information security", "soc analyst", "penetration testing", "ethical hacker", "siem", "vulnerability", "incident response")) {
-            roles.addAll(List.of("Cybersecurity Analyst", "SOC Analyst", "Security Engineer", "Penetration Tester", "Cloud Security Engineer"));
-        }
-        if (containsAny(resumeText, "mechanical engineer", "solidworks", "autocad", "ansys", "manufacturing", "production engineer", "cnc", "cad", "cam", "thermodynamics", "hvac")) {
-            roles.addAll(List.of("Mechanical Engineer", "Mechanical Design Engineer", "Manufacturing Engineer", "Production Engineer", "CAD Engineer"));
-        }
-        if (containsAny(resumeText, "civil engineer", "structural", "construction", "autocad civil", "quantity survey", "geotechnical", "site engineer", "revit")) {
-            roles.addAll(List.of("Civil Engineer", "Structural Engineer", "Construction Engineer", "Site Engineer", "Project Engineer"));
-        }
-        if (containsAny(resumeText, "automotive", "vehicle", "ev engineer", "battery management", "adas", "autonomous driving", "powertrain")) {
-            roles.addAll(List.of("Automotive Engineer", "Automotive Embedded Engineer", "EV Engineer", "Battery Engineer", "ADAS Engineer"));
-        }
-        if (containsAny(resumeText, "figma", "user experience", "ux", "ui design", "prototype", "wireframe", "graphic design")) {
-            roles.addAll(List.of("UX Designer", "UI Designer", "Product Designer", "UX Researcher", "Visual Designer"));
-        }
-        if (containsAny(resumeText, "product manager", "roadmap", "agile", "scrum", "stakeholder", "product owner")) {
-            roles.addAll(List.of("Product Manager", "Product Owner", "Program Manager", "Business Analyst", "Project Manager"));
-        }
-        if (containsAny(resumeText, "marketing", "seo", "sem", "social media", "content marketing", "brand manager")) {
-            roles.addAll(List.of("Digital Marketing Specialist", "SEO Specialist", "Marketing Analyst", "Content Strategist", "Brand Manager"));
-        }
-        if (containsAny(resumeText, "accounting", "finance", "financial analyst", "banking", "audit", "tax", "risk management")) {
-            roles.addAll(List.of("Financial Analyst", "Accountant", "Risk Analyst", "Audit Analyst", "Banking Operations Analyst"));
-        }
-        if (containsAny(resumeText, "nurse", "clinical", "pharmac", "medical", "healthcare", "hospital", "biomedical")) {
-            roles.addAll(List.of("Clinical Research Associate", "Healthcare Administrator", "Medical Laboratory Technician", "Biomedical Engineer", "Pharmacist"));
-        }
-        if (roles.isEmpty()) {
-            roles.addAll(List.of("Software Engineer", "Business Analyst", "Operations Analyst", "Project Coordinator"));
-        }
-        return List.copyOf(roles);
-    }
-
-    private List<String> detectSeniority(String resumeText) {
-        java.util.regex.Matcher years = Pattern.compile("(\\d+)\\+?\\s*(?:years|yrs)").matcher(resumeText);
-        int maximumYears = 0;
-        while (years.find()) {
-            maximumYears = Math.max(maximumYears, Integer.parseInt(years.group(1)));
-        }
-        if (maximumYears == 0 && containsAny(resumeText, "fresher", "entry level", "intern", "graduate", "student")) {
-            return List.of("Intern", "Graduate", "Junior");
-        }
-        if (maximumYears >= 6) {
-            return List.of("Senior", "Lead", "Principal");
-        }
-        if (maximumYears >= 2) {
-            return List.of("Mid-level", "Senior", "Specialist");
-        }
-        return List.of("Junior", "Associate", "Trainee");
-    }
-
-    private boolean containsAny(String text, String... terms) {
-        for (String term : terms) {
-            if (text.contains(term)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private JobMatchDto fallback(String title, String company, String location, String url, int score) {
-        return new JobMatchDto(title, company, location, "Search current openings for this resume-matched role and apply on the original job platform.", url, score, true);
-    }
-
-    private Set<String> words(String value) {
-        Set<String> result = new HashSet<>();
-        var matcher = WORDS.matcher(value.toLowerCase(Locale.ROOT));
-        while (matcher.find()) {
-            String word = matcher.group();
-            if (!STOP_WORDS.contains(word)) {
-                result.add(word);
-            }
-        }
-        return result;
-    }
-
-    private String text(JsonNode node, String field) {
-        return node.path(field).asText("").trim();
-    }
-
-    private String clean(String description) {
-        return description.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim();
+        private static void add(String text,Set<String> roles,Set<String> skills,Set<String> domain,List<String> signals,List<String> matches) { if(has(text,signals.toArray(String[]::new))) {roles.addAll(matches);domain.addAll(signals);signals.stream().filter(text::contains).forEach(skills::add);} }
+        private static boolean has(String text,String... terms) { for(String term:terms) if(text.contains(term)) return true; return false; }
     }
 }

@@ -10,6 +10,9 @@ import com.resumeanalyzer.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.beans.factory.annotation.Value;
+import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    @Value("${app.frontend-url:http://localhost:4200}")
+    private String frontendUrl;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(
@@ -31,15 +36,15 @@ public class AuthController {
     }
 
     @GetMapping("/verify")
-    public ResponseEntity<String> verify(
+    public ResponseEntity<Void> verify(
             @RequestParam String token
     ) {
 
         authService.verify(token);
 
-        return ResponseEntity.ok(
-                "Email verified successfully. You can now sign in."
-        );
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .header(HttpHeaders.LOCATION, URI.create(frontendUrl.replaceAll("/$", "") + "/auth?verified=true").toString())
+                .build();
     }
 
         @PostMapping("/resend-verification")
